@@ -272,8 +272,6 @@ export default function ProductList({ products, onRowClick, onAddProduct, onEdit
     setSelectedImageUrl(imageUrl);
     setImageModalOpen(true);
   };
-  
-  };
 
   const confirmDelete = (productId: string) => {
     setProductToDelete(productId);
@@ -294,28 +292,25 @@ export default function ProductList({ products, onRowClick, onAddProduct, onEdit
       <div className="md:hidden h-full">
         <ScrollArea className="h-full">
             <div className="grid gap-4 p-4 pb-20">
-                            <div className="flex justify-between items-center text-xs">
-                                <span className="text-muted-foreground font-semibold">Distribuidor:</span>
-                                <span className="font-medium text-right truncate max-w-[150px] uppercase">{displayDistributor}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-xs">
-                                <span className="text-muted-foreground font-semibold">Segmento:</span>
-                                <Badge variant="secondary" className="text-[10px] bg-primary/5 text-primary border-none font-semibold uppercase">{product.segment || itemData['CATEGORIA'] || 'OUTROS'}</Badge>
-                            </div>
-                            <div className="flex justify-between items-center text-xs">
-                                <span className="text-muted-foreground font-semibold">Status:</span>
-                                <Badge variant={(product.status === 'Ativo' || itemData['STATUS'] === 'Ativo') ? 'success' : 'destructive'} className="text-[10px] font-semibold uppercase">{product.status || itemData['STATUS'] || 'Ativo'}</Badge>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-              )
-            }) : (
-            <div className="h-40 flex flex-col items-center justify-center rounded-xl border border-dashed border-primary/20 bg-background/50 backdrop-blur-sm text-muted-foreground gap-2">
-                <Package className="h-8 w-8 opacity-20" />
-                <span className="font-semibold text-sm">Nenhum item encontrado.</span>
-            </div>
-            )}
+                {products.length > 0 ? products.map((product) => (
+                    <ProductCard 
+                        key={product.id}
+                        product={product}
+                        onRowClick={onRowClick}
+                        suppliersMap={suppliersMap}
+                        distributorName={distributorName}
+                        isReadOnly={isReadOnly}
+                        onAddProduct={onAddProduct}
+                        onEdit={onEdit}
+                        confirmDelete={confirmDelete}
+                        handleImageClick={handleImageClick}
+                    />
+                )) : (
+                    <div className="h-40 flex flex-col items-center justify-center rounded-xl border border-dashed border-primary/20 bg-background/50 backdrop-blur-sm text-muted-foreground gap-2">
+                        <Package className="h-8 w-8 opacity-20" />
+                        <span className="font-semibold text-sm">Nenhum item encontrado.</span>
+                    </div>
+                )}
             </div>
         </ScrollArea>
       </div>
