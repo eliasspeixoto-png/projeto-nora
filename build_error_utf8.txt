@@ -1,0 +1,86 @@
+﻿
+> nextn@4.5.2 build
+> next build
+
+node.exe : [baseline-browser-mapping] The 
+data in this module is over two months 
+old.  To ensure accurate Baseline data, 
+please update: `npm i 
+baseline-browser-mapping@latest -D`
+No C:\Program Files\nodejs\npm.ps1:29 
+caractere:3
++   & $NODE_EXE $NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified 
+   : ([baseline-brows...ping@latest -D`:S  
+  tring) [], RemoteException
+    + FullyQualifiedErrorId : NativeComman 
+   dError
+ 
+  Ôû▓ Next.js 14.2.35
+  - Environments: .env.local, .env
+
+   Creating an optimized production build ...
+> [PWA] Compile server
+> [PWA] Compile server
+> [PWA] Compile client (static)
+> [PWA] Auto register service worker with: C:\Users\Administrador\Documents\PROJETO NORA\node_modules\next-pwa\register.js
+> [PWA] Service worker: C:\Users\Administrador\Documents\PROJETO NORA\public\sw.js
+> [PWA]   url: /sw.js
+> [PWA]   scope: /
+Browserslist: caniuse-lite is outdated. 
+Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://g
+ithub.com/browserslist/update-db#readme
+Browserslist: browsers data (caniuse-lite) 
+is 6 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://g
+ithub.com/browserslist/update-db#readme
+ Ô£ô Compiled successfully
+   Skipping validation of types
+   Skipping linting
+   Collecting page data ...
+PageNotFoundError: Cannot find module for 
+page: /cliente/definir-senha
+    at getPagePath 
+(C:\Users\Administrador\Documents\PROJETO N
+ORA\node_modules\next\dist\server\require.j
+s:94:15)
+    at requirePage 
+(C:\Users\Administrador\Documents\PROJETO N
+ORA\node_modules\next\dist\server\require.j
+s:99:22)
+    at 
+C:\Users\Administrador\Documents\PROJETO NO
+RA\node_modules\next\dist\server\load-compo
+nents.js:103:84
+    at process.processTicksAndRejections 
+(node:internal/process/task_queues:105:5)
+    at async loadComponentsImpl 
+(C:\Users\Administrador\Documents\PROJETO N
+ORA\node_modules\next\dist\server\load-comp
+onents.js:103:26)
+    at async 
+C:\Users\Administrador\Documents\PROJETO NO
+RA\node_modules\next\dist\build\utils.js:11
+16:32
+    at async Span.traceAsyncFn 
+(C:\Users\Administrador\Documents\PROJETO N
+ORA\node_modules\next\dist\trace\trace.js:1
+54:20) {
+  code: 'ENOENT'
+}
+
+> Build error occurred
+Error: Failed to collect page data for 
+/cliente/definir-senha
+    at 
+C:\Users\Administrador\Documents\PROJETO NO
+RA\node_modules\next\dist\build\utils.js:12
+69:15
+    at process.processTicksAndRejections 
+(node:internal/process/task_queues:105:5) {
+  type: 'Error'
+}

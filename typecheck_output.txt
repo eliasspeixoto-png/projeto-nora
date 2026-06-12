@@ -1,0 +1,30 @@
+﻿
+> nextn@4.5.2 typecheck
+> tsc --noEmit
+
+src/ai/genkit.ts(12,5): error TS2353: Object literal may only specify known properties, and 'enableTracingAndMetrics' does not exist in type 'GenkitOptions'.
+src/app/(client)/cliente/meus-dados/page.tsx(115,76): error TS2554: Expected 3 arguments, but got 4.
+src/app/fiscal/FiscalPageClient.tsx(165,18): error TS2339: Property 'data' does not exist on type '{ success: boolean; data?: any; error?: string | undefined; debugPayload?: object | undefined; } | { success: boolean; error: string | undefined; debugPayload: any; }'.
+  Property 'data' does not exist on type '{ success: boolean; error: string | undefined; debugPayload: any; }'.
+src/app/fiscal/FiscalPageClient.tsx(166,89): error TS2339: Property 'data' does not exist on type '{ success: boolean; data?: any; error?: string | undefined; debugPayload?: object | undefined; } | { success: boolean; error: string | undefined; debugPayload: any; }'.
+  Property 'data' does not exist on type '{ success: boolean; error: string | undefined; debugPayload: any; }'.
+src/app/fiscal/FiscalPageClient.tsx(208,18): error TS2339: Property 'data' does not exist on type '{ success: boolean; data?: any; error?: string | undefined; debugPayload?: object | undefined; } | { success: boolean; error: string | undefined; debugPayload: any; }'.
+  Property 'data' does not exist on type '{ success: boolean; error: string | undefined; debugPayload: any; }'.
+src/app/ordem-de-servico/page.tsx(150,87): error TS1501: This regular expression flag is only available when targeting 'es2018' or later.
+src/app/ordem-de-servico/page.tsx(619,122): error TS1501: This regular expression flag is only available when targeting 'es2018' or later.
+src/app/relatorios/desempenho/page.tsx(181,81): error TS2345: Argument of type '(prev: DateRange | undefined) => { to: Date | undefined; from?: Date | undefined; }' is not assignable to parameter of type 'SetStateAction<DateRange | undefined>'.
+  Type '(prev: DateRange | undefined) => { to: Date | undefined; from?: Date | undefined; }' is not assignable to type '(prevState: DateRange | undefined) => DateRange | undefined'.
+    Type '{ to: Date | undefined; from?: Date | undefined; }' is not assignable to type 'DateRange'.
+      Property 'from' is optional in type '{ to: Date | undefined; from?: Date | undefined; }' but required in type 'DateRange'.
+src/app/relatorios/extrato-cliente/page.tsx(282,17): error TS2322: Type 'import("C:/Users/Administrador/Documents/PROJETO NORA/src/lib/data").HistoryItem | null' is not assignable to type 'import("C:/Users/Administrador/Documents/PROJETO NORA/src/components/relatorios/HistoryPageClient").HistoryItem | null'.
+  Type 'Client & { type: "client"; deletedAt: string; }' is not assignable to type 'HistoryItem | null'.
+    Type 'Client & { type: "client"; deletedAt: string; }' is not assignable to type '(Quote & { type: "os"; }) | (Visit & { type: "visit"; }) | (PurchaseOrder & { type: "purchase"; })'.
+      Type 'Client & { type: "client"; deletedAt: string; }' is not assignable to type 'Visit & { type: "visit"; }'.
+        Type 'Client & { type: "client"; deletedAt: string; }' is missing the following properties from type 'Visit': visitNumber, clientId, technicianId, visitDate, and 2 more.
+src/app/relatorios/resultados/page.tsx(124,98): error TS2345: Argument of type '(p: DateRange | undefined) => { to: Date | undefined; from?: Date | undefined; }' is not assignable to parameter of type 'SetStateAction<DateRange | undefined>'.
+  Type '(p: DateRange | undefined) => { to: Date | undefined; from?: Date | undefined; }' is not assignable to type '(prevState: DateRange | undefined) => DateRange | undefined'.
+    Type '{ to: Date | undefined; from?: Date | undefined; }' is not assignable to type 'DateRange'.
+      Property 'from' is optional in type '{ to: Date | undefined; from?: Date | undefined; }' but required in type 'DateRange'.
+src/app/settings/page.tsx(793,29): error TS2322: Type '{ children: Element; orientation: string; className: string; }' is not assignable to type 'IntrinsicAttributes & Omit<ScrollAreaProps & RefAttributes<HTMLDivElement>, "ref"> & RefAttributes<...>'.
+  Property 'orientation' does not exist on type 'IntrinsicAttributes & Omit<ScrollAreaProps & RefAttributes<HTMLDivElement>, "ref"> & RefAttributes<...>'.
+src/components/layout/SidebarWrapper.tsx(84,29): error TS2339: Property 'subItems' does not exist on type '{ href: string; label: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; page: string; color: string; }'.

@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Helper: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Global Helper: Get authenticated user's profile data
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Global Helper: Check if user belongs to a specific company or is a developer
+    function isAtCompany(companyId) {
+      return isAuthenticated() && (getUserData().companyId == companyId || getUserData().role == 'developer');
+    }
+
+    // Global Helper: Check for developer role via profile
+    function isDev() {
+      return isAuthenticated() && getUserData().role == 'developer';
+    }
+
+    // Rule for the users collection
+    match /users/{userId} {
+      // Users can see their own profile. Admins can see profiles in their own company. Devs see everything.
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        isDev() || 
+        resource.data.role == 'distribuidor' ||
+        (getUserData().role == 'admin' && getUserData().companyId == resource.data.companyId)
+      );
+      // Permite a busca de usuários por e-mail durante o login (White Label)
+      allow list: if true;
+      
+      // Users can edit their own profile. Admins can edit users in their own company.
+      allow write: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        isDev() || 
+        (getUserData().role == 'admin' && (
+          // For updates: must be same company
+          (resource != null && getUserData().companyId == resource.data.companyId && request.resource.data.companyId == resource.data.companyId) ||
+          // For creations: must be same company
+          (resource == null && getUserData().companyId == request.resource.data.companyId)
+        ))
+      );
+    }
+
+    // Rule for the companies collection - Publicly readable for branding (get by ID only)
+    match /companies/{companyId} {
+      allow get: if true; 
+      allow list: if isAuthenticated();
+      allow write: if isDev() || (isAtCompany(companyId) && getUserData().role == 'admin');
+    }
+
+    // Rule for the clients collection - Publicly readable for shared links (get by ID only)
+    match /clients/{clientId} {
+      allow get: if true;
+      allow list: if isAuthenticated();
+      allow write: if isDev() || (
+        isAtCompany(request.resource.data.companyId) && 
+        (resource == null || resource.data.companyId == request.resource.data.companyId)
+      );
+    }
+
+    // Rule for the quotes collection (Budgets and OS)
+    match /quotes/{quoteId} {
+      // Allow public viewing via link
+      allow get: if true;
+      // Listing requires authentication
+      allow list: if isAuthenticated();
+      // Creation requires company membership
+      allow create: if isAtCompany(request.resource.data.companyId);
+      // Update rule
+      allow update: if 
+        // 1. Company members can update (but cannot change companyId)
+        (isAtCompany(resource.data.companyId) && request.resource.data.companyId == resource.data.companyId) || 
+        // 2. Public users can ONLY update status and history (e.g. approving/refusing)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'statusHistory', 'scheduleStatus', 'scheduleStatusHistory']));
+    }
+
+    // Rule for accountsReceivable - Publicly readable for payment links
+    match /accountsReceivable/{receivableId} {
+      allow get: if true;
+      allow list: if isAuthenticated() && isAtCompany(resource.data.companyId);
+      allow create: if isAtCompany(request.resource.data.companyId);
+      allow update: if isAtCompany(resource.data.companyId) && request.resource.data.companyId == resource.data.companyId;
+      allow delete: if isAtCompany(resource.data.companyId);
+    }
+
+    // Rule for location history - Admin only (Enforced via API, but kept for security)
+    match /locationHistory/{docId} {
+      allow read: if isAuthenticated() && (
+        getUserData().role == 'admin' || getUserData().role == 'developer'
+      );
+      // Writes are allowed for authenticated users (tracking themselves)
+      allow write: if isAuthenticated();
+    }
+
+    // Rule for leads collection - Publicly writable from the website
+    match /leads/{leadId} {
+      allow create: if true; 
+      allow read, update, delete: if isAtCompany(resource.data.companyId || (resource != null ? resource.data.companyId : request.resource.data.companyId));
+    }
+
+    // Generic rule for all other company-partitioned collections
+    match /{collectionName}/{docId} {
+      allow read: if isAtCompany(resource.data.companyId);
+      allow create: if isAtCompany(request.resource.data.companyId);
+      allow update: if isAtCompany(resource.data.companyId) && request.resource.data.companyId == resource.data.companyId;
+      allow delete: if isAtCompany(resource.data.companyId);
+    }
+  }
+}
+

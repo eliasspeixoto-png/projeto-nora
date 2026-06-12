@@ -1,0 +1,15 @@
+﻿src/app/comodato/ComodatoPageClient.tsx(5,24): error TS2307: Cannot find module '@/components/ui/button' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(6,75): error TS2307: Cannot find module '@/components/ui/card' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(7,31): error TS2307: Cannot find module '@/lib/data' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(8,23): error TS2307: Cannot find module '@/components/ui/badge' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(14,23): error TS2307: Cannot find module '@/components/ui/input' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(15,25): error TS2307: Cannot find module '@/firebase/auth/use-user' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(19,8): error TS2307: Cannot find module '@/lib/firebase/firestore' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(20,26): error TS2307: Cannot find module '@/hooks/use-toast' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(21,33): error TS2307: Cannot find module '@/hooks/use-sortable-data' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(27,8): error TS2307: Cannot find module '@/components/ui/dropdown-menu' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(35,8): error TS2307: Cannot find module '@/components/ui/table' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(46,8): error TS2307: Cannot find module '@/components/ui/alert-dialog' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(47,58): error TS2307: Cannot find module '@/components/ui/tabs' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(55,8): error TS2307: Cannot find module '@/components/ui/dialog' or its corresponding type declarations.
+src/app/comodato/ComodatoPageClient.tsx(58,33): error TS2307: Cannot find module '@/components/clientes/add-edit-client-dialog' or its corresponding type declarations.

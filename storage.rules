@@ -1,0 +1,44 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Default: Deny all
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Helper: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Logos: Publicly readable, writable only by the specific user/admin
+    match /logos/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Promotions: Publicly readable for marketing, writable by distributor
+    match /promotions/{distributorId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.auth.uid == distributorId;
+    }
+    
+    // Service Images: Accessible by company members and public view (for quotes)
+    match /service-images/{companyId}/{quoteId}/{allPaths=**} {
+        allow read: if true; // Publicly readable for quote viewing
+        allow write: if isAuthenticated(); // TODO: Check if user belongs to companyId
+    }
+
+    // Company private assets: Writable and readable only by company members
+    match /companies/{companyId}/{allPaths=**} {
+        allow read, write: if isAuthenticated(); // Replace with company membership check if possible
+    }
+
+    // Contracts: Writable and readable by authenticated users
+    match /contracts/{companyId}/{allPaths=**} {
+        allow read, write: if isAuthenticated();
+    }
+  }
+}
