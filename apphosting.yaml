@@ -5,9 +5,9 @@ version: v1
 env:
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
     value: studio-2629657699-721b1
-secrets:
   - variable: DEEPSEEK_API_KEY
-    secret: DEEPSEEK_API_KEY
+    value: ${DEEPSEEK_API_KEY}
+secrets:
   - variable: FIREBASE_SERVICE_ACCOUNT
     secret: FIREBASE_SERVICE_ACCOUNT
   - variable: GMAIL_CLIENT_ID
