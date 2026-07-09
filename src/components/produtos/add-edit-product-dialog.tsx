@@ -274,6 +274,15 @@ export default function AddEditProductDialog({ isOpen, setOpen, onProductSaved, 
     try {
       if (imageFile) {
         const { storage } = firebase;
+        if (!storage) {
+          toast({
+            variant: "destructive",
+            title: "Erro ao enviar imagem",
+            description: "O serviço de armazenamento não está disponível. Salve o produto sem imagem e tente adicionar a imagem pela tela de Produtos.",
+          });
+          setIsSubmitting(false);
+          return;
+        }
         await new Promise<void>((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(imageFile);

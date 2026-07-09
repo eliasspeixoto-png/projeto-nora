@@ -5,12 +5,12 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Client, Product, Quote, QuoteItem, QuoteData, ComodatoAsset } from "@/lib/data";
+import { Client, Product, Quote, QuoteItem, QuoteData, ComodatoAsset, Supplier } from "@/lib/data";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, User, ListChecks, Search, Save, Trash2, ShieldQuestion, X, Lock, PlusCircle, ClipboardList } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { getProducts, getClients, addQuote, getCompany, getQuote, updateQuote, getComodatoAssets, updateProduct, addProduct, addClient, updateVisit } from "@/lib/firebase/firestore";
+import { getProducts, getClients, addQuote, getCompany, getQuote, updateQuote, getComodatoAssets, updateProduct, addProduct, addClient, updateVisit, getSuppliers } from "@/lib/firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/firebase/auth/use-user";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -74,6 +74,7 @@ export function EditGeneralQuoteComponent({ isModal = false, osType: osTypeProp,
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [comodatoAssets, setComodatoAssets] = useState<ComodatoAsset[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -151,6 +152,7 @@ export function EditGeneralQuoteComponent({ isModal = false, osType: osTypeProp,
     );
 
     const unsubComodato = getComodatoAssets(db, companyId, setComodatoAssets, console.error);
+    const unsubSuppliers = getSuppliers(db, companyId, setSuppliers, console.error);
 
     if (isEditing) {
       getQuote(db, quoteId).then(existingQuote => {
@@ -177,6 +179,7 @@ export function EditGeneralQuoteComponent({ isModal = false, osType: osTypeProp,
       unsubProducts();
       unsubClients();
       unsubComodato();
+      unsubSuppliers();
     };
 
   }, [companyId, isEditing, quoteId, router, toast, firebase.db]);
@@ -724,7 +727,7 @@ export function EditGeneralQuoteComponent({ isModal = false, osType: osTypeProp,
             setOpen={setProductDialogOpen}
             onProductSaved={onProductSaved}
             product={editingProduct}
-            suppliers={[]}
+            suppliers={suppliers}
             locations={[]}
           />
 
