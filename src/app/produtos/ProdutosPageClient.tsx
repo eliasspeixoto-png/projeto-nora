@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/firebase/auth/use-user';
 import { getProducts, addProduct, updateProduct, deleteProduct, getSuppliers, getStockLocations, bulkAddProducts } from '@/lib/firebase/firestore';
 import type { Product, Supplier, StockLocation } from '@/lib/data';
@@ -50,6 +50,7 @@ export default function ProdutosPageClient() {
   const [isPriceUpdateOpen, setPriceUpdateOpen] = useState(false);
   const [fileToImport, setFileToImport] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (userProfile?.companyId && firebase.db) {
@@ -80,6 +81,13 @@ export default function ProdutosPageClient() {
         setIsLoading(false);
     }
   }, [userProfile?.companyId, firebase.db, filterStatus]);
+
+  // Rola a lista para o topo sempre que a busca ou filtro mudar
+  useEffect(() => {
+    if (listContainerRef.current) {
+      listContainerRef.current.scrollTop = 0;
+    }
+  }, [searchTerm, filterStatus]);
   
   const onProductSaved = async (productData: Omit<Product, 'id' | 'companyId'>) => {
     if (!userProfile?.companyId || !firebase.db) return;
@@ -129,10 +137,10 @@ export default function ProdutosPageClient() {
   const filteredProducts = sortedProducts.filter((product) => {
     const search = searchTerm.toLowerCase();
     return (
-      product.description.toLowerCase().startsWith(search) ||
-      product.item.toLowerCase().startsWith(search) ||
-      (product.manufacturer && product.manufacturer.toLowerCase().startsWith(search)) ||
-      (product.segment && product.segment.toLowerCase().startsWith(search))
+      product.description.toLowerCase().includes(search) ||
+      product.item.toLowerCase().includes(search) ||
+      (product.manufacturer && product.manufacturer.toLowerCase().includes(search)) ||
+      (product.segment && product.segment.toLowerCase().includes(search))
     );
   });
   
@@ -243,7 +251,7 @@ export default function ProdutosPageClient() {
         </div>
       ) : (
         <Card className="flex-1 flex flex-col min-h-0">
-            <CardContent className="flex-1 overflow-auto p-0">
+            <CardContent ref={listContainerRef} className="flex-1 overflow-auto p-0">
                 <ProductList 
                     products={filteredProducts} 
                     onEdit={handleEdit} 

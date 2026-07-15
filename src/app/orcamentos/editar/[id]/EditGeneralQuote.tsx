@@ -95,6 +95,14 @@ export function EditGeneralQuoteComponent({ isModal = false, osType: osTypeProp,
 
   const [productSearch, setProductSearch] = useState('');
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
+  const productListRef = useRef<HTMLDivElement>(null);
+
+  // Rola a lista de produtos para o topo a cada nova busca
+  useEffect(() => {
+    if (productListRef.current) {
+      productListRef.current.scrollTop = 0;
+    }
+  }, [productSearch]);
 
   const [isProductDialogOpen, setProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
@@ -677,7 +685,7 @@ export function EditGeneralQuoteComponent({ isModal = false, osType: osTypeProp,
                           <PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-2xl">
                             <Command shouldFilter={false}>
                               <CommandInput placeholder="Ex: Central, Cerca, Sensor..." value={productSearch} onValueChange={setProductSearch} />
-                              <CommandList>
+                              <CommandList ref={productListRef}>
                                 <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
                                 <CommandGroup>
                                   {filteredProducts.map((product) => (

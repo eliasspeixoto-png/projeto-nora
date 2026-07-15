@@ -323,7 +323,7 @@ export const updateCompany = async (db: Firestore, id: string, data: Partial<Com
 export const getProducts = (db: Firestore, companyId: string, onUpdate: (data: Product[]) => void, onError: (e: any) => void, filter: string = 'Ativo') => {
     let q = query(collection(db, PRODUCTS_COLLECTION), where("companyId", "==", companyId));
     if (filter !== 'Todos') q = query(q, where("status", "==", filter));
-    q = query(q, limit(300));
+    q = query(q, limit(2000));
     return onSnapshot(q, (snap) => {
         onUpdate(snap.docs
             .map(d => ({ id: d.id, ...d.data() } as Product))
