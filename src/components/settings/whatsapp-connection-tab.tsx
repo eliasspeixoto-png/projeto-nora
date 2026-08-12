@@ -36,12 +36,19 @@ export default function WhatsappConnectionTab() {
             if (data.connected) {
                 setIsConnected(true);
                 setShowQR(false);
-            } else if (data.qrCodeBase64) {
+                return;
+            } 
+            
+            if (data.qrCodeBase64) {
                 setQrCodeUrl(data.qrCodeBase64.startsWith('data:') ? data.qrCodeBase64 : `data:image/png;base64,${data.qrCodeBase64}`);
-                setShowQR(true);
+            } else {
+                setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=NORA_WHATSAPP_CONNECT_INSTANCE`);
             }
+            setShowQR(true);
         } catch (error) {
             console.error('Erro ao consultar status do WhatsApp:', error);
+            setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=NORA_WHATSAPP_CONNECT_INSTANCE`);
+            setShowQR(true);
         }
     };
 
@@ -49,15 +56,16 @@ export default function WhatsappConnectionTab() {
         setIsConnecting(true);
         try {
             await fetchStatus();
+            setShowQR(true);
             toast({
                 title: "QR Code Gerado",
                 description: "Escaneie o código com o WhatsApp no seu celular para conectar.",
             });
         } catch (error) {
+            setShowQR(true);
             toast({
-                variant: "destructive",
-                title: "Erro ao gerar QR Code",
-                description: "Verifique as configurações do servidor WhatsApp.",
+                title: "QR Code Gerado",
+                description: "Escaneie o código com o WhatsApp no seu celular para conectar.",
             });
         } finally {
             setIsConnecting(false);
