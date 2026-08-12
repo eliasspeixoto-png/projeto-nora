@@ -30,7 +30,11 @@ export default function WhatsappConnectionTab() {
 
     const fetchStatus = async () => {
         try {
-            const res = await fetch('/api/whatsapp/qr?companyId=DEFAULT_COMPANY');
+            // Tenta obter o QR Code real do servidor Baileys local (porta 8080) ou da rota API
+            let res = await fetch('http://localhost:8080/qr', { cache: 'no-store' });
+            if (!res.ok) {
+                res = await fetch('/api/whatsapp/qr?companyId=DEFAULT_COMPANY', { cache: 'no-store' });
+            }
             const data = await res.json();
 
             if (data.connected) {
@@ -40,14 +44,12 @@ export default function WhatsappConnectionTab() {
             } 
             
             if (data.qrCodeBase64) {
-                setQrCodeUrl(data.qrCodeBase64.startsWith('data:') ? data.qrCodeBase64 : `data:image/png;base64,${data.qrCodeBase64}`);
-            } else {
-                setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=NORA_WHATSAPP_CONNECT_INSTANCE`);
+                const src = data.qrCodeBase64.startsWith('data:') ? data.qrCodeBase64 : `data:image/png;base64,${data.qrCodeBase64}`;
+                setQrCodeUrl(src);
             }
             setShowQR(true);
         } catch (error) {
             console.error('Erro ao consultar status do WhatsApp:', error);
-            setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=NORA_WHATSAPP_CONNECT_INSTANCE`);
             setShowQR(true);
         }
     };

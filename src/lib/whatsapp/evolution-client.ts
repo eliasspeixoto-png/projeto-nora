@@ -18,6 +18,23 @@ const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'nora_whatsapp_secret
  */
 export async function getWhatsappQrCode(companyId: string): Promise<WhatsappStatus> {
     const instanceName = `NORA_${companyId.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+    // Tenta primeiro o servidor nativo Baileys local (porta 8080)
+    try {
+        const localRes = await fetch('http://localhost:8080/qr', { cache: 'no-store' });
+        if (localRes.ok) {
+            const localData = await localRes.json();
+            return {
+                connected: localData.connected,
+                state: localData.state === 'open' ? 'open' : 'connecting',
+                qrCodeBase64: localData.qrCodeBase64,
+                instanceName: 'NORA_LOCAL_BAILEYS',
+                phone: localData.phone
+            };
+        }
+    } catch (e) {
+        // Se a porta 8080 não responder, faz o fallback para a URL externa
+    }
     
     try {
         const response = await fetch(`${EVOLUTION_API_URL}/instance/connect/${instanceName}`, {
