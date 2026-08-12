@@ -155,7 +155,7 @@ export default function WhatsappConnectionTab() {
                                 <div className="text-center space-y-6 relative z-10 w-full flex flex-col items-center">
                                     <div className="bg-white p-4 rounded-2xl shadow-sm border border-border/40 inline-block relative cursor-pointer" onClick={handleSimulateScan} title="Clique no QR para simular leitura">
                                         {/* Dynamic or Fallback QR Code */}
-                                        <Image src={qrCodeUrl || "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=SimulaConexaoNora"} alt="QR Code" width={200} height={200} className="w-48 h-48 opacity-90 object-contain" />
+                                        <img src={qrCodeUrl || "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=SimulaConexaoNora"} alt="QR Code" className="w-48 h-48 opacity-90 object-contain mx-auto" />
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/5 opacity-0 hover:opacity-100 transition-opacity rounded-xl">
                                             <span className="bg-background/90 text-primary text-[10px] uppercase font-bold py-1 px-3 rounded-full backdrop-blur-md">Clique para Simular Leitura</span>
                                         </div>
