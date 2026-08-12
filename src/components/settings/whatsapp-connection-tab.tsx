@@ -13,6 +13,9 @@ import Image from "next/image";
 
 export default function WhatsappConnectionTab() {
     const { toast } = useToast();
+    const [isConnected, setIsConnected] = useState(false);
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [showQR, setShowQR] = useState(false);
     const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
 
     // Simulated states for automations
