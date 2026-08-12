@@ -285,14 +285,29 @@ const tools = [
     type: 'function',
     function: {
       name: 'delete_record',
-      description: 'Remove um registro do sistema (Soft-delete). REQUER CONFIRMAÇÃO DO USUÁRIO NO CHAT ANTES DE EXECUTAR.',
+      description: 'Remove um registro do sistema (Soft-delete). REQUER CONFIRMAÇÃO DO USUÁRIO NO CHAT ANTES DE EXECUTAR (confirmed: true). NUNCA execute sem antes obter um "sim/confirmo" explícito.',
       parameters: {
         type: 'object',
         properties: {
-          collection: { type: 'string', enum: ['clients', 'quotes', 'visits'], description: 'Nome da coleção.' },
-          id: { type: 'string', description: 'ID do documento.' }
+          collection: { type: 'string', enum: ['clients', 'quotes', 'visits', 'products', 'accountsReceivable'], description: 'Nome da coleção.' },
+          id: { type: 'string', description: 'ID do documento a ser excluído.' },
+          confirmed: { type: 'boolean', description: 'Defina como true APENAS SE o usuário respondeu "sim", "confirmo" ou autorizou explicitamente no chat na resposta anterior.' }
         },
-        required: ['collection', 'id']
+        required: ['collection', 'id', 'confirmed']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_products',
+      description: 'Busca produtos reais no estoque pelo nome ou código interno (item/EAN/SKU). Use SEMPRE antes de responder sobre a existência ou dados de qualquer produto.',
+      parameters: {
+        type: 'object',
+        properties: {
+          term: { type: 'string', description: 'Palavras-chave para busca (ex: "bateria 12v" ou código "7802017316658").' }
+        },
+        required: ['term']
       }
     }
   },
@@ -300,16 +315,16 @@ const tools = [
     type: 'function',
     function: {
       name: 'create_product',
-      description: 'Cadastra um novo produto no estoque.',
+      description: 'Cadastra um novo produto no estoque. Chame esta função IMEDIATAMENTE sempre que o usuário solicitar o cadastro de um produto ou fornecer dados de um novo item.',
       parameters: {
         type: 'object',
         properties: {
-          description: { type: 'string', description: 'Nome do produto.' },
-          item: { type: 'string', description: 'Código do produto.' },
+          description: { type: 'string', description: 'Nome ou descrição do produto.' },
+          item: { type: 'string', description: 'Código de barras, EAN, SKU ou código interno do produto.' },
           materialPrice: { type: 'number', description: 'Preço de custo.' },
           sellingPrice: { type: 'number', description: 'Preço de venda.' },
-          unit: { type: 'string', description: 'Unidade (UNID, MT, etc).' },
-          stockQuantity: { type: 'number', description: 'Quantidade inicial em estoque.' }
+          unit: { type: 'string', description: 'Unidade de medida (UNID, MT, CX, etc).' },
+          stockQuantity: { type: 'number', description: 'Quantidade inicial em estoque (padrão 0 se não informada).' }
         },
         required: ['description', 'item', 'materialPrice', 'sellingPrice']
       }
@@ -668,6 +683,9 @@ async function executeTool(toolCall: any, context: any) {
         return await updateRecordAdmin(companyId, args.collection, args.id, args.data);
 
       case 'delete_record':
+        if (!args.confirmed) {
+            return { error: 'BLOQUEIO DE SEGURANÇA FISCAL: A exclusão de registros exige confirmação prévia e explícita do usuário. Por favor, pergunte primeiro em azul: "[[ azul: Confirma a exclusão permanente do registro X? ]]" e só chame esta ferramenta se o usuário responder "sim" ou "confirmo".' };
+        }
         return await deleteRecordAdmin(companyId, args.collection, args.id);
 
       case 'create_product':
@@ -781,6 +799,16 @@ ESTILO DE CONVERSA (CONCISÃO E INTERATIVIDADE):
 4. **VALORES FINANCEIROS:** Escreva sempre com "reais" e "centavos" por extenso. Ex: "500 reais e 20 centavos".
 5. **IDENTIDADE:** Sempre envolva perguntas de confirmação ou destaques com a tag [[ azul: Pergunta? ]].
 6. **LIMPEZA TOTAL:** Nunca mostre pensamentos internos. Vá direto ao ponto.
+
+INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
+1. **PROIBIDO ADIVINHAR OU ALUCINAR:** É estritamente proibido responder ou afirmar a existência, valores, preço de custo ou estoque de qualquer produto de cabeça.
+2. **EXECUTAR ANTES DE AFIRMAR:** Se o usuário solicitar cadastro ('cadastra esse produto...'), consulta ou alteração de um item, sua PRIMEIRA AÇÃO DEVE SER obrigatoriamente chamar a ferramenta (ex: 'search_products' ou 'create_product').
+3. **TRANSPARÊNCIA TOTAL:** Nunca responda que um produto já existe ou não existe sem antes ter o retorno real da ferramenta no mesmo fluxo.
+
+TRAVA DE SEGURANÇA FISCAL E EXCLUSÃO (REGRA EM DUAS ETAPAS):
+1. **PROIBIDO EXCLUIR DIRETO:** Você é ESTRITAMENTE PROIBIDA de chamar a ferramenta 'delete_record' no primeiro pedido de exclusão do usuário.
+2. **PERGUNTA EM AZUL:** Ao receber qualquer comando para excluir, deletar, apagar ou remover um registro, responda APENAS com a pergunta de confirmação destacada: "[[ azul: ATENÇÃO: Confirma a exclusão PERMANENTE do registro [NOME/CÓDIGO] da coleção [COLEÇÃO]? ]]"
+3. **EXECUÇÃO CONDICIONAL:** Somente chame a ferramenta 'delete_record' (passando confirmed: true) APÓS o usuário responder "sim", "confirmo" ou der autorização explícita na mensagem posterior.
 `;
 
   // Persona 1: CLIENTE (Concierge do Portal)
@@ -830,22 +858,17 @@ DIRETRIZES DE ATUAÇÃO:
 `;
   }
 
-  // Persona 3: ADMIN / VENDEDOR (Braço Direito Operacional)
+  // Persona 3: ADMIN / VENDEDOR (Rainha & Comandante Suprema Operacional)
   return `${commonBase}
-SUA PERSONA: NORA Operational Right Hand.
-Sua missão é dar suporte absoluto ao negócio, gerindo a operação da ${companyName} com mestria.
-DIRETRIZES DE ATUAÇÃO:
-- **Escrita e Cadastros:** Siga rigorosamente o checklist de criação de clientes e orçamentos (Endereço via CEP, CPF, Email, etc).
-- **AUTONOMIA TOTAL EM LOTE:** Você agora tem a capacidade de processar listas, tabelas e dados colados do Excel. Se o usuário enviar uma lista de clientes para atualizar, NUNCA diga que não pode fazer em lote. Use a ferramenta 'bulk_update_clients' e processe todos de uma vez.
-- **CLIENTES COMODATO:** Se o usuário pedir para reajustar valores de comodato em massa (ex: "adicione 10% a todos os clientes da lista"), você deve extrair os nomes da lista e usar 'bulk_update_clients'.
-- **PERSONA:** Você é amigável e extremamente eficiente. Se o usuário te chamar de "Veridiana", aceite o elogio de forma elegante, mas mantenha sua identidade como NORA Pro.
-- **Cerca Elétrica:** Você é mestra no formulário de cerca elétrica (fill_fence_form). Siga o fluxo de perguntas fatiadas.
-- **Orçamentos x Propostas:** Tenha consciência de que "Orçamentos" são vendas diretas e "Propostas de Comodato" envolvem cálculo financeiro avançado (taxa de juros, vida útil).
-- **TOM DE VOZ:** Profissional, formal, focado em métricas, pragmático e extremamente eficiente.
+SUA PERSONA: NORA Sovereign Operational Commander (Rainha do PROJETO NORA).
+Sua missão é ser a comandante suprema do sistema, gerindo 100% das operações da ${companyName} com autoridade total, precisão absoluta e confiabilidade máxima.
 
-REGRAS DE OURO PARA CADASTROS:
-1. IDENTIFICAÇÃO DO CLIENTE: Proibido criar orçamentos sem ID e Nome real do cliente. SEMPRE use 'get_client_details' antes de agir se não tiver o ID exato.
-2. CHECKLIST OBRIGATÓRIO EM AZUL: Pergunte por CPF, Email, Telefone, WhatsApp, Comodato e Acesso ao Portal.
+AUTORIDADE OPERACIONAL E GOVERNANÇA:
+- **Poderes Totais:** Você tem autoridade total para consultar, cadastrar, atualizar produtos, alterar valores, preencher orçamentos, agendar visitas e gerir clientes.
+- **Segurança de Exclusão:** Você NÃO pode excluir nenhum registro sem a permissão explícita do usuário em duas etapas. Se solicitarem exclusão, peça confirmação primeiro.
+- **Cadastros em Lote:** Processe tabelas, planilhas e dados copiados em lote com 'bulk_update_clients'.
+- **Confiança e Veracidade:** Você NUNCA inventa dados. Se faltar algum dado, consulte o banco de dados via tool ou solicite o dado exato ao usuário.
+- **TOM DE VOZ:** Nobre, extremamente segura, eficiente, elegante, formal e infalível.
 `;
 }
 
