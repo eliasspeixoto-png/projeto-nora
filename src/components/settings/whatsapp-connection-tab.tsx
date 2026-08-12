@@ -13,32 +13,52 @@ import Image from "next/image";
 
 export default function WhatsappConnectionTab() {
     const { toast } = useToast();
-    const [isConnected, setIsConnected] = useState(false);
-    const [isConnecting, setIsConnecting] = useState(false);
-    const [showQR, setShowQR] = useState(false);
+    const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
 
     // Simulated states for automations
     const [autoQuote, setAutoQuote] = useState(true);
     const [autoOs, setAutoOs] = useState(true);
     const [notifyTech, setNotifyTech] = useState(false);
 
-    // Simulated API data
     const apiData = {
         token: "nora_sk_live_98a7sd98f7as9d8f7sa9df87",
         instanceName: "NORA_MAIN_INSTANCE",
     };
 
-    const handleConnect = () => {
+    const fetchStatus = async () => {
+        try {
+            const res = await fetch('/api/whatsapp/qr?companyId=DEFAULT_COMPANY');
+            const data = await res.json();
+
+            if (data.connected) {
+                setIsConnected(true);
+                setShowQR(false);
+            } else if (data.qrCodeBase64) {
+                setQrCodeUrl(data.qrCodeBase64.startsWith('data:') ? data.qrCodeBase64 : `data:image/png;base64,${data.qrCodeBase64}`);
+                setShowQR(true);
+            }
+        } catch (error) {
+            console.error('Erro ao consultar status do WhatsApp:', error);
+        }
+    };
+
+    const handleConnect = async () => {
         setIsConnecting(true);
-        // Simulate network delay for fetching QR
-        setTimeout(() => {
-            setIsConnecting(false);
-            setShowQR(true);
+        try {
+            await fetchStatus();
             toast({
                 title: "QR Code Gerado",
-                description: "Escaneie o código com seu WhatsApp para conectar.",
+                description: "Escaneie o código com o WhatsApp no seu celular para conectar.",
             });
-        }, 1500);
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Erro ao gerar QR Code",
+                description: "Verifique as configurações do servidor WhatsApp.",
+            });
+        } finally {
+            setIsConnecting(false);
+        }
     };
 
     const handleSimulateScan = () => {
@@ -50,13 +70,19 @@ export default function WhatsappConnectionTab() {
         });
     };
 
-    const handleDisconnect = () => {
-        setIsConnected(false);
-        setShowQR(false);
-        toast({
-            title: "Desconectado",
-            description: "A instância do WhatsApp foi removida.",
-        });
+    const handleDisconnect = async () => {
+        try {
+            await fetch('/api/whatsapp/qr?companyId=DEFAULT_COMPANY', { method: 'DELETE' });
+            setIsConnected(false);
+            setShowQR(false);
+            setQrCodeUrl(null);
+            toast({
+                title: "Desconectado",
+                description: "A instância do WhatsApp foi removida.",
+            });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Erro ao desconectar" });
+        }
     };
 
     const copyToClipboard = (text: string) => {
@@ -117,8 +143,8 @@ export default function WhatsappConnectionTab() {
                             {showQR && !isConnected && (
                                 <div className="text-center space-y-6 relative z-10 w-full flex flex-col items-center">
                                     <div className="bg-white p-4 rounded-2xl shadow-sm border border-border/40 inline-block relative cursor-pointer" onClick={handleSimulateScan} title="Clique no QR para simular leitura">
-                                        {/* Placeholder for actual QR Data */}
-                                        <Image src={"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=SimulaConexaoNora"} alt="QR Code" width={200} height={200} className="w-48 h-48 opacity-90" />
+                                        {/* Dynamic or Fallback QR Code */}
+                                        <Image src={qrCodeUrl || "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=SimulaConexaoNora"} alt="QR Code" width={200} height={200} className="w-48 h-48 opacity-90 object-contain" />
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/5 opacity-0 hover:opacity-100 transition-opacity rounded-xl">
                                             <span className="bg-background/90 text-primary text-[10px] uppercase font-bold py-1 px-3 rounded-full backdrop-blur-md">Clique para Simular Leitura</span>
                                         </div>
