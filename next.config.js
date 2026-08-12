@@ -81,6 +81,8 @@ const nextConfig = {
       "@": path.resolve(__dirname, 'src'),
       "sharp$": false,
       "onnxruntime-node$": false,
+      "protobufjs": false,
+      "@whiskeysockets/baileys": false,
     };
 
     config.module.rules.push({
