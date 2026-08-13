@@ -10,6 +10,7 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const { transcribeAudioBuffer } = require('./transcribe');
+const { textToSpeechBuffer } = require('./tts');
 
 let latestQrCodeBase64 = null;
 let connectionStatus = 'connecting';
@@ -107,9 +108,34 @@ async function startBaileys() {
 
         if (text && remoteJid) {
             console.log(`\n📲 [WHATSAPP RECEBIDO] De: ${remoteJid} -> "${text}"`);
+
+            if (!global.waResponseModes) global.waResponseModes = new Map();
+            const lowerText = text.trim().toLowerCase();
+
+            // Comandos rápidos de alteração do Modo de Resposta
+            if (lowerText === 'modo voz' || lowerText === 'responder por voz' || lowerText === 'ativar voz') {
+                global.waResponseModes.set(remoteJid, 'voice');
+                await sock.sendMessage(remoteJid, { text: "🔊 *Modo Voz Ativado!* A partir de agora vou te responder com notas de voz no WhatsApp." });
+                return;
+            }
+            if (lowerText === 'modo texto' || lowerText === 'responder por texto' || lowerText === 'ativar texto') {
+                global.waResponseModes.set(remoteJid, 'text');
+                await sock.sendMessage(remoteJid, { text: "📝 *Modo Texto Ativado!* A partir de agora vou te responder por mensagens de texto." });
+                return;
+            }
+            if (lowerText === 'modo auto' || lowerText === 'modo automatico') {
+                global.waResponseModes.set(remoteJid, 'auto');
+                await sock.sendMessage(remoteJid, { text: "⚡ *Modo Automático Ativado!* Vou responder por voz quando você mandar áudio, e por texto quando você mandar mensagem." });
+                return;
+            }
+            if (lowerText === 'modo ambos') {
+                global.waResponseModes.set(remoteJid, 'both');
+                await sock.sendMessage(remoteJid, { text: "🎙️📝 *Modo Ambos Ativado!* Vou te enviar a resposta em texto e a nota de voz simultaneamente." });
+                return;
+            }
             
             try {
-                // Envia sinal de digitando
+                // Envia sinal de digitando ou gravando áudio
                 await sock.sendPresenceUpdate('composing', remoteJid);
 
                 // Memória de histórico da conversa por remetente
@@ -141,8 +167,41 @@ async function startBaileys() {
                                 .replace(/\[\[ azul: (.*?) \]\]/g, '*$1*')
                                 .replace(/\*\*(.*?)\*\*/g, '*$1*');
 
-                            await sock.sendMessage(remoteJid, { text: cleanText });
-                            console.log(`🤖 [NORA RESPONSES] Enviado para ${remoteJid}`);
+                            const currentMode = global.waResponseModes.get(remoteJid) || 'auto';
+                            const isIncomingAudio = hasAudio;
+                            const shouldSendVoice = (currentMode === 'voice' || currentMode === 'both' || (currentMode === 'auto' && isIncomingAudio));
+                            const shouldSendText = (currentMode === 'text' || currentMode === 'both' || (currentMode === 'auto' && !isIncomingAudio));
+
+                            // 1. Envia resposta em Texto se aplicável
+                            if (shouldSendText) {
+                                await sock.sendMessage(remoteJid, { text: cleanText });
+                                console.log(`🤖 [NORA TEXTO RESPONSES] Enviado para ${remoteJid}`);
+                            }
+
+                            // 2. Envia resposta em Nota de Voz (Áudio PTT) se aplicável
+                            if (shouldSendVoice) {
+                                console.log(`🎙️ [ENVIANDO NOTA DE VOZ] Sintetizando voz da NORA para ${remoteJid}...`);
+                                try {
+                                    await sock.sendPresenceUpdate('recording', remoteJid);
+                                    const voiceBuffer = await textToSpeechBuffer(responseText);
+                                    if (voiceBuffer) {
+                                        await sock.sendMessage(remoteJid, {
+                                            audio: voiceBuffer,
+                                            mimetype: 'audio/mp4',
+                                            ptt: true
+                                        });
+                                        console.log(`🎙️ [NORA VOZ RESPONSES] Nota de voz entregue para ${remoteJid}`);
+                                    } else if (!shouldSendText) {
+                                        // Se falhou o áudio e não tinha enviado texto, envia o texto como fallback
+                                        await sock.sendMessage(remoteJid, { text: cleanText });
+                                    }
+                                } catch (voiceErr) {
+                                    console.error("Erro ao enviar resposta de voz:", voiceErr);
+                                    if (!shouldSendText) {
+                                        await sock.sendMessage(remoteJid, { text: cleanText });
+                                    }
+                                }
+                            }
                         } catch (e) {
                             console.error('Erro ao ler resposta da NORA:', e);
                         }
