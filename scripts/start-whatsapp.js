@@ -3,12 +3,13 @@
  * Conecta diretamente ao WhatsApp Web sem passar pelo Facebook/Meta.
  */
 
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const qrcodeTerminal = require('qrcode-terminal');
 const QRCode = require('qrcode');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
+const { transcribeAudioBuffer } = require('./transcribe');
 
 let latestQrCodeBase64 = null;
 let connectionStatus = 'connecting';
@@ -69,7 +70,30 @@ async function startBaileys() {
         if (!msg || msg.key.fromMe || !msg.message) return;
 
         const remoteJid = msg.key.remoteJid;
-        const text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption;
+        let text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption;
+
+        // Se a mensagem recebida for um ÁUDIO/NOTA DE VOZ
+        if (!text && (msg.message.audioMessage || msg.message.documentWithCaptionMessage?.message?.audioMessage)) {
+            console.log(`\n🎙️ [ÁUDIO RECEBIDO] Baixando nota de voz de ${remoteJid}...`);
+            try {
+                await sock.sendPresenceUpdate('recording', remoteJid);
+                const audioBuffer = await downloadMediaMessage(msg, 'buffer', {});
+                console.log(`🎙️ [ÁUDIO BAIXADO] ${audioBuffer.length} bytes. Transcrevendo para texto...`);
+
+                const transcribedText = await transcribeAudioBuffer(audioBuffer);
+                if (transcribedText) {
+                    console.log(`📝 [ÁUDIO TRANSSCRITO COM SUCESSO]: "${transcribedText}"`);
+                    text = `[Áudio enviado pelo usuário]: "${transcribedText}"`;
+                } else {
+                    console.warn("⚠️ Não foi possível converter o áudio em texto.");
+                    await sock.sendMessage(remoteJid, { text: "Desculpe, não consegui compreender o áudio perfeitamente. Poderia enviar novamente ou mandar por mensagem de texto? 😊" });
+                    return;
+                }
+            } catch (audioErr) {
+                console.error("Erro ao baixar/transcrever áudio do WhatsApp:", audioErr);
+                return;
+            }
+        }
 
         if (text && remoteJid) {
             console.log(`\n📲 [WHATSAPP RECEBIDO] De: ${remoteJid} -> "${text}"`);
