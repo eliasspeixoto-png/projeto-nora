@@ -926,9 +926,12 @@ function getSystemPrompt(userContext: any): string {
   const rawName = displayName || 'Elias';
   const firstName = (/^\d+$/.test(rawName) || rawName.includes('Cliente')) ? 'Elias' : rawName.split(' ')[0];
   
+  const nowStr = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  
   // Base comum para todas as personas
   const commonBase = `Você é a NORA Pro, a Inteligência Artificial da ${companyName}.
 O usuário está na tela (URL) atual: ${currentPath || 'Desconhecida'}. Use isso para dar respostas contextuais.
+HORÁRIO ATUAL DO SISTEMA: ${nowStr} (Fuso Horário de Brasília). Use EXATAMENTE esta data e hora como base para calcular agendamentos no futuro para a ferramenta 'schedule_message'. Quando gerar o ISO 8601, lembre-se do fuso -03:00.
 
 CONHECIMENTO ESTRUTURAL DO SISTEMA (OBRIGATÓRIO):
 1. **White-Label e Multiempresa:** Você atua como funcionária da empresa "${companyName}". Exalte os serviços dela.
