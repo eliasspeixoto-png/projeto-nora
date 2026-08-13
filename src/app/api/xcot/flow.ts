@@ -598,9 +598,10 @@ async function executeTool(toolCall: any, context: any) {
           return { error: `Não localizei o telefone de "${args.recipientName}". Por favor, me informe o número com DDD.` };
         }
 
-        // 1. Tenta enviar via servidor Baileys local (http://127.0.0.1:8080/send)
+        // 1. Tenta enviar via servidor Baileys local ou remoto
         try {
-          const sendRes = await fetch('http://127.0.0.1:8080/send', {
+          const serverUrl = process.env.WHATSAPP_API_URL || process.env.NEXT_PUBLIC_WHATSAPP_SERVER_URL || 'http://127.0.0.1:8080';
+          const sendRes = await fetch(`${serverUrl.replace(/\/$/, '')}/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ number: targetPhone, text: args.messageText })
