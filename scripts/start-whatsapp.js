@@ -108,8 +108,8 @@ async function startBaileys() {
                     messages: [{ role: 'user', content: text }],
                     userContext: {
                         uid: `wa_${remoteJid.split('@')[0]}`,
-                        companyId: 'DEFAULT_COMPANY',
-                        companyName: 'NORA Segurança',
+                        companyId: 'Z6XlJobG4TfPoYMwLNC0',
+                        companyName: 'ESP-TEC INSTALAÇÕES LTDA.',
                         role: 'admin',
                         displayName: contactName,
                         currentPath: '/whatsapp'

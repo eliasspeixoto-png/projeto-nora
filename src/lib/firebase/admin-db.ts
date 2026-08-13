@@ -70,11 +70,6 @@ export const getCollectionStatsAdmin = async (companyId: string, collectionName:
     let snap = await query.get();
     let docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(d => !d.deletedAt);
 
-    if (docs.length === 0) {
-        const fallbackSnap = await firestore.collection(targetColl).get();
-        docs = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(d => !d.deletedAt);
-    }
-
     if (targetColl === USERS_COLLECTION) {
         docs = docs.filter(d => d.role !== 'cliente' && d.userType !== 'cliente');
     }
@@ -220,14 +215,6 @@ export const getDetailedListAdmin = async (companyId: string, collectionName: st
     
     let snap = await query.get();
     let docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(d => !d.deletedAt);
-
-    if (docs.length === 0) {
-        const fallbackSnap = await firestore.collection(targetColl).get();
-        docs = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(d => !d.deletedAt);
-        if (statusFilter) {
-            docs = docs.filter(d => d.status?.toLowerCase() === statusFilter.toLowerCase());
-        }
-    }
 
     if (targetColl === USERS_COLLECTION) {
         docs = docs.filter(d => d.role !== 'cliente' && d.userType !== 'cliente');
@@ -691,17 +678,11 @@ export const createToolAdmin = async (companyId: string, data: any) => {
 };
 
 export const getProductsAdmin = async (companyId: string) => {
-    let snap = await firestore.collection(PRODUCTS_COLLECTION)
+    const snap = await firestore.collection(PRODUCTS_COLLECTION)
         .where("companyId", "==", companyId)
-        .where("status", "==", "Ativo")
         .get();
 
-    let prods = snap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(p => !p.deletedAt);
-
-    if (prods.length === 0) {
-        const fallbackSnap = await firestore.collection(PRODUCTS_COLLECTION).get();
-        prods = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(p => !p.deletedAt && p.status !== 'Inativo');
-    }
-
-    return prods;
+    return snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(p => !p.deletedAt && p.status !== 'Inativo');
 };
