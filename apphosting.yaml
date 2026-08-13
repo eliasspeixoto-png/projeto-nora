@@ -7,6 +7,12 @@ env:
     value: studio-2629657699-721b1
   - variable: DEEPSEEK_API_KEY
     value: ${DEEPSEEK_API_KEY}
+  - variable: NEXT_PUBLIC_WHATSAPP_SERVER_URL
+    value: https://nora-whatsapp-service-853808240420.us-central1.run.app
+  - variable: WHATSAPP_SERVER_URL
+    value: https://nora-whatsapp-service-853808240420.us-central1.run.app
+  - variable: WHATSAPP_API_URL
+    value: http://34.73.237.168:8080
 secrets:
   - variable: FIREBASE_SERVICE_ACCOUNT
     secret: FIREBASE_SERVICE_ACCOUNT
