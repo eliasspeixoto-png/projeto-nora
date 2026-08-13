@@ -70,10 +70,20 @@ async function startBaileys() {
         if (!msg || msg.key.fromMe || !msg.message) return;
 
         const remoteJid = msg.key.remoteJid;
+        console.log(`📩 [MENSAGEM RECEBIDA] De: ${remoteJid} | Chaves:`, Object.keys(msg.message));
+
         let text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption;
 
+        const hasAudio = !!(
+            msg.message.audioMessage || 
+            msg.message.ephemeralMessage?.message?.audioMessage ||
+            msg.message.viewOnceMessageV2?.message?.audioMessage ||
+            msg.message.viewOnceMessage?.message?.audioMessage ||
+            msg.message.documentWithCaptionMessage?.message?.audioMessage
+        );
+
         // Se a mensagem recebida for um ÁUDIO/NOTA DE VOZ
-        if (!text && (msg.message.audioMessage || msg.message.documentWithCaptionMessage?.message?.audioMessage)) {
+        if (!text && hasAudio) {
             console.log(`\n🎙️ [ÁUDIO RECEBIDO] Baixando nota de voz de ${remoteJid}...`);
             try {
                 await sock.sendPresenceUpdate('recording', remoteJid);
