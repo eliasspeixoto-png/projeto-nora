@@ -147,8 +147,12 @@ async function startBaileys() {
                 if (userHistory.length > 10) userHistory = userHistory.slice(-10);
                 global.waChatHistory.set(remoteJid, userHistory);
 
-                // Chama o endpoint local do NORA Flow via HTTP
-                const req = http.request('http://localhost:3001/api/xcot', {
+                // Chama o endpoint local do NORA Flow via HTTP (porta 3000 do Next.js)
+                const nextPort = process.env.PORT || 3000;
+                const req = http.request({
+                    hostname: 'localhost',
+                    port: nextPort,
+                    path: '/api/xcot',
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 }, (res) => {
