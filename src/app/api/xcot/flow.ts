@@ -486,6 +486,11 @@ const tools = [
                   term: { type: 'string', description: 'Nome ou Código do cliente para identificar qual será atualizado.' },
                   data: { type: 'object', description: 'Objeto com os campos a serem alterados (ex: { isComodato: true, serviceValue: 500 }).' }
                 },
+                required: ['term', 'data']
+              }
+            }
+          },
+          required: ['updates']
         }
       }
     },
