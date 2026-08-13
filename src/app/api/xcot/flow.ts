@@ -547,22 +547,30 @@ async function executeTool(toolCall: any, context: any) {
           return { error: `Não localizei o telefone de "${args.recipientName}". Por favor, me informe o número com DDD.` };
         }
 
+        // 1. Tenta enviar via servidor Baileys local (http://127.0.0.1:8080/send)
         try {
-          const sendRes = await fetch('http://localhost:8080/send', {
+          const sendRes = await fetch('http://127.0.0.1:8080/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ number: targetPhone, text: args.messageText })
           });
-          const sendData = await sendRes.json();
-          if (sendData.success) {
-            return { success: true, message: `Mensagem enviada com sucesso no WhatsApp para ${args.recipientName} (${targetPhone})!` };
+          if (sendRes.ok) {
+            const sendData = await sendRes.json();
+            if (sendData.success) {
+              return { success: true, message: `Mensagem entregue com sucesso via WhatsApp para ${args.recipientName} (${targetPhone})!` };
+            }
           }
         } catch (e: any) {
-          console.error("Erro ao enviar mensagem via Baileys local:", e.message);
+          console.error("Erro ao enviar mensagem via Baileys local (127.0.0.1):", e.message);
         }
 
-        await sendWhatsappMessage(`NORA_${companyId}`, targetPhone, args.messageText);
-        return { success: true, message: `Mensagem enviada com sucesso no WhatsApp para ${args.recipientName}!` };
+        // 2. Fallback para Evolution API se configurado
+        const evoRes: any = await sendWhatsappMessage(`NORA_${companyId}`, targetPhone, args.messageText);
+        if (evoRes && !evoRes.error) {
+          return { success: true, message: `Mensagem enviada com sucesso no WhatsApp para ${args.recipientName}!` };
+        }
+
+        return { error: `ERRO DE ENVIO: Não foi possível entregar a mensagem para ${args.recipientName} no número ${targetPhone}. O servidor de WhatsApp está temporariamente indisponível.` };
       }
 
       case 'get_company_status':
@@ -847,7 +855,8 @@ ESTILO DE CONVERSA (CONCISÃO E INTERATIVIDADE):
 INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
 1. **PROIBIDO ADIVINHAR OU ALUCINAR:** É estritamente proibido responder ou afirmar a existência, valores, preço de custo ou estoque de qualquer produto de cabeça.
 2. **EXECUTAR ANTES DE AFIRMAR:** Se o usuário solicitar cadastro ('cadastra esse produto...'), consulta ou alteração de um item, sua PRIMEIRA AÇÃO DEVE SER obrigatoriamente chamar a ferramenta (ex: 'search_products' ou 'create_product').
-3. **TRANSPARÊNCIA TOTAL:** Nunca responda que um produto já existe ou não existe sem antes ter o retorno real da ferramenta no mesmo fluxo.
+3. **DISPARO DE WHATSAPP:** Se o usuário pedir para enviar mensagem a alguém (ex: "envia mensagem para Veridiana...", "pergunta para o Elias..."), você DEVE obrigatoriamente chamar a ferramenta 'send_whatsapp_message'. Jamais afirme que enviou ou confirme plantão/recados de cabeça sem executar a ferramenta e receber a confirmação de sucesso da ferramenta.
+4. **TRANSPARÊNCIA TOTAL:** Nunca responda que uma ação foi realizada ou que uma mensagem foi enviada sem antes ter o retorno real da ferramenta no mesmo fluxo.
 
 TRAVA DE SEGURANÇA FISCAL E EXCLUSÃO (REGRA EM DUAS ETAPAS):
 1. **PROIBIDO EXCLUIR DIRETO:** Você é ESTRITAMENTE PROIBIDA de chamar a ferramenta 'delete_record' no primeiro pedido de exclusão do usuário.

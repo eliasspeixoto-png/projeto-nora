@@ -186,7 +186,7 @@ const server = http.createServer((req, res) => {
     }
 });
 
-server.listen(8080, () => {
-    console.log('🚀 Servidor HTTP de QR Code WhatsApp rodando em http://localhost:8080/qr');
+server.listen(8080, '0.0.0.0', () => {
+    console.log('🚀 Servidor HTTP de QR Code e Envio de WhatsApp rodando em http://127.0.0.1:8080/qr');
     startBaileys();
 });
