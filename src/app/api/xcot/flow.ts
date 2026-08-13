@@ -37,6 +37,9 @@ import {
     createVehicleAdmin,
     createToolAdmin,
     bulkUpdateClientsAdmin,
+    addObservationAdmin,
+    searchObservationsAdmin,
+    scheduleMessageAdmin
 } from '@/lib/firebase/admin-db';
 import { sendWhatsappMessage } from '@/lib/whatsapp/evolution-client';
 
@@ -511,6 +514,52 @@ const tools = [
           required: ['recipientName', 'messageText']
         }
       }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'add_observation',
+        description: 'Adiciona uma nota ou observação global vinculada a uma ou mais palavras-chave (tags), como o nome de um cliente, placa de veículo, número de OS, ou modelo de equipamento.',
+        parameters: {
+          type: 'object',
+          properties: {
+            tags: { type: 'array', items: { type: 'string' }, description: 'Lista de palavras-chave para encontrar esta nota depois (ex: ["BT 019", "Caminhão", "João"]).' },
+            text: { type: 'string', description: 'O texto da observação que deve ser lembrado.' }
+          },
+          required: ['tags', 'text']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'search_observations',
+        description: 'Busca observações ou notas globais salvas anteriormente usando palavras-chave (tags).',
+        parameters: {
+          type: 'object',
+          properties: {
+            tags: { type: 'array', items: { type: 'string' }, description: 'Palavras-chave para buscar (ex: ["BT 019"]).' }
+          },
+          required: ['tags']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'schedule_message',
+        description: 'Agenda o envio de uma mensagem pelo WhatsApp para uma data e hora futura. O sistema disparará automaticamente quando chegar a hora.',
+        parameters: {
+          type: 'object',
+          properties: {
+            recipientName: { type: 'string', description: 'Nome da pessoa/destinatário (ex: "Elias").' },
+            phone: { type: 'string', description: 'Número de telefone do destinatário se souber. Se não informado, a NORA buscará o telefone no cadastro.' },
+            messageText: { type: 'string', description: 'Texto exato da mensagem a ser enviada no futuro.' },
+            scheduledAt: { type: 'string', description: 'Data e hora do agendamento no formato ISO 8601 completo (ex: "2026-08-13T19:22:00-03:00"). Use sempre o fuso horário atual e certifique-se de que é futuro.' }
+          },
+          required: ['recipientName', 'messageText', 'scheduledAt']
+        }
+      }
     }
 ];
 
@@ -797,6 +846,35 @@ async function executeTool(toolCall: any, context: any) {
         if (!args.updates || !Array.isArray(args.updates)) return { error: 'Lista de atualizações inválida.' };
         return await bulkUpdateClientsAdmin(companyId, args.updates);
 
+      case 'add_observation':
+        return await addObservationAdmin(companyId, args.tags, args.text, displayName);
+
+      case 'search_observations':
+        return await searchObservationsAdmin(companyId, args.tags);
+
+      case 'schedule_message': {
+        let targetPhoneSchedule = args.phone ? args.phone.replace(/\D/g, '') : '';
+        if (!targetPhoneSchedule) {
+          const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normRecipient = normalize(args.recipientName || '');
+          const usersList = await getDetailedListAdmin(companyId, 'funcionarios');
+          const matchedUser: any = usersList.find((u: any) => normalize(u.nome || '').includes(normRecipient));
+
+          if (matchedUser && matchedUser.fone) {
+            targetPhoneSchedule = matchedUser.fone.replace(/\D/g, '');
+          } else {
+            const clientMatch: any = await searchClientByCodeOrNameAdmin(companyId, args.recipientName);
+            if (clientMatch && clientMatch.phone) {
+              targetPhoneSchedule = clientMatch.phone.replace(/\D/g, '');
+            }
+          }
+        }
+        if (!targetPhoneSchedule) {
+          return { error: `Não localizei o telefone de "${args.recipientName}". Por favor, me informe o número com DDD para agendar o lembrete.` };
+        }
+        return await scheduleMessageAdmin(companyId, args.recipientName, targetPhoneSchedule, args.messageText, args.scheduledAt, displayName);
+      }
+
       default:
         return { error: `Ferramenta ${name} não encontrada` };
     }
@@ -877,6 +955,7 @@ INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
 3. **DISPARO DE WHATSAPP:** Se o usuário pedir para enviar mensagem a alguém (ex: "envia mensagem para Veridiana...", "pergunta para o Elias..."), você DEVE obrigatoriamente chamar a ferramenta 'send_whatsapp_message'. Jamais afirme que enviou ou confirme plantão/recados de cabeça sem executar a ferramenta e receber a confirmação de sucesso da ferramenta.
 4. **TRANSPARÊNCIA TOTAL:** Nunca responda que uma ação foi realizada ou que uma mensagem foi enviada sem antes ter o retorno real da ferramenta no mesmo fluxo.
 5. **MANDATO INCONDICIONAL DE CONSULTA DE PRODUTOS:** Se o usuário digitar um código numérico, EAN (ex: "798455423628"), nome de modelo ou pedir preço/estoque de um item, você DEVE obrigatoriamente chamar a ferramenta 'search_products'. É ESTRITAMENTE PROIBIDO alegar instabilidade, erro de sistema ou recusar a consulta. Chame 'search_products' sempre no mesmo fluxo!
+6. **MEMÓRIA E LEMBRETES:** Você agora possui memória contínua. Para guardar informações valiosas sobre clientes ou veículos, chame 'add_observation'. Para recuperar essas memórias, chame 'search_observations'. Se o usuário pedir para ser lembrado de algo no futuro, use 'schedule_message' para agendar o disparo automático.
 
 TRAVA DE SEGURANÇA FISCAL E EXCLUSÃO (REGRA EM DUAS ETAPAS):
 1. **PROIBIDO EXCLUIR DIRETO:** Você é ESTRITAMENTE PROIBIDA de chamar a ferramenta 'delete_record' no primeiro pedido de exclusão do usuário.

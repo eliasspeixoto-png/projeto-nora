@@ -686,3 +686,55 @@ export const getProductsAdmin = async (companyId: string) => {
         .map(d => ({ id: d.id, ...d.data() } as any))
         .filter(p => !p.deletedAt && p.status !== 'Inativo');
 };
+
+export const addObservationAdmin = async (companyId: string, tags: string[], text: string, author: string) => {
+    try {
+        const docRef = await firestore.collection('observations').add({
+            companyId,
+            tags: tags.map(t => t.toLowerCase().trim()),
+            text,
+            author,
+            createdAt: new Date().toISOString(),
+            status: 'Ativo'
+        });
+        return { success: true, id: docRef.id, message: 'Observação registrada com sucesso.' };
+    } catch (e: any) {
+        return { error: 'Falha ao registrar observação: ' + e.message };
+    }
+};
+
+export const searchObservationsAdmin = async (companyId: string, tags: string[]) => {
+    try {
+        let query: any = firestore.collection('observations')
+            .where('companyId', '==', companyId)
+            .where('status', '==', 'Ativo');
+        
+        if (tags && tags.length > 0) {
+            // Firestore array-contains-any can search up to 10 elements
+            query = query.where('tags', 'array-contains-any', tags.map(t => t.toLowerCase().trim()));
+        }
+        
+        const snap = await query.orderBy('createdAt', 'desc').limit(20).get();
+        return snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+    } catch (e: any) {
+        return { error: 'Falha ao buscar observações: ' + e.message };
+    }
+};
+
+export const scheduleMessageAdmin = async (companyId: string, recipientName: string, phone: string, messageText: string, scheduledAt: string, author: string) => {
+    try {
+        const docRef = await firestore.collection('scheduled_messages').add({
+            companyId,
+            recipientName,
+            phone,
+            messageText,
+            scheduledAt,
+            author,
+            status: 'pending',
+            createdAt: new Date().toISOString()
+        });
+        return { success: true, id: docRef.id, message: `Mensagem agendada com sucesso para ${scheduledAt}.` };
+    } catch (e: any) {
+        return { error: 'Falha ao agendar mensagem: ' + e.message };
+    }
+};

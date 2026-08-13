@@ -3,7 +3,7 @@
  * Conecta diretamente ao WhatsApp Web sem passar pelo Facebook/Meta.
  */
 
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const qrcodeTerminal = require('qrcode-terminal');
 const QRCode = require('qrcode');
 const http = require('http');
@@ -11,24 +11,84 @@ const path = require('path');
 const fs = require('fs');
 const { transcribeAudioBuffer } = require('./transcribe');
 const { textToSpeechBuffer } = require('./tts');
+const admin = require('firebase-admin');
+const { useFirestoreAuthState } = require('./use-firestore-auth');
+
+// Inicializa o Firebase Admin
+if (!admin.apps.length) {
+    admin.initializeApp();
+}
+const db = admin.firestore();
+const whatsappAuthCollection = db.collection('whatsapp_auth_v3');
 
 let latestQrCodeBase64 = null;
 let connectionStatus = 'connecting';
 let connectedPhone = null;
 let globalSock = null;
 
-async function startBaileys() {
-    const authPath = path.join(__dirname, '../.whatsapp_auth');
-    if (!fs.existsSync(authPath)) {
-        fs.mkdirSync(authPath, { recursive: true });
+// Formata o número do WhatsApp recebido para os formatos salvos no Firestore
+function formatPhoneVariations(jid) {
+    const num = jid.split('@')[0];
+    if (num.startsWith('55') && num.length >= 12) {
+        const ddd = num.substring(2, 4);
+        const digits = num.substring(4);
+        let forms = [];
+        if (digits.length === 9) {
+            forms.push(`(${ddd}) ${digits.substring(0,5)}-${digits.substring(5)}`); // Ex: (79) 99547-8211
+            forms.push(`(${ddd}) ${digits.substring(1,5)}-${digits.substring(5)}`); // Ex: (79) 9547-8211
+        } else if (digits.length === 8) {
+            forms.push(`(${ddd}) ${digits.substring(0,4)}-${digits.substring(4)}`); // Ex: (79) 9547-8211
+            forms.push(`(${ddd}) 9${digits.substring(0,4)}-${digits.substring(4)}`); // Ex: (79) 99547-8211
+        }
+        forms.push(num); // Ex: 5579995478211
+        forms.push(digits); // Ex: 995478211
+        forms.push(`+${num}`);
+        return forms;
+    }
+    return [num];
+}
+
+// Busca o usuário ou cliente no Firestore
+async function lookupUserOrClient(remoteJid) {
+    const phones = formatPhoneVariations(remoteJid);
+    
+    // 1. Tenta achar na coleção de usuários (funcionários)
+    let snap = await db.collection('users').where('phone', 'in', phones).limit(1).get();
+    if (snap.empty) snap = await db.collection('users').where('whatsapp', 'in', phones).limit(1).get();
+    if (!snap.empty) {
+        const u = snap.docs[0].data();
+        return {
+            companyId: u.companyId,
+            role: u.role || 'user',
+            displayName: u.displayName || u.name || 'Funcionário'
+        };
     }
 
-    const { state, saveCreds } = await useMultiFileAuthState(authPath);
+    // 2. Tenta achar na coleção de clientes
+    let clientSnap = await db.collection('clients').where('phone', 'in', phones).limit(1).get();
+    if (clientSnap.empty) clientSnap = await db.collection('clients').where('whatsapp', 'in', phones).limit(1).get();
+    if (!clientSnap.empty) {
+        const c = clientSnap.docs[0].data();
+        return {
+            companyId: c.companyId,
+            role: 'client',
+            displayName: c.name || 'Cliente'
+        };
+    }
+
+    return null; // Desconhecido
+}
+
+async function startBaileys() {
+    const { state, saveCreds } = await useFirestoreAuthState(whatsappAuthCollection);
+    const { version } = await fetchLatestBaileysVersion();
+    console.log(`WA version: ${version.join('.')}`);
 
     const sock = makeWASocket({
+        version,
         auth: state,
         printQRInTerminal: true,
-        browser: ['NORA AI System', 'Chrome', '1.0.0']
+        browser: ['Mac OS', 'Chrome', '121.0.0.0']
     });
     globalSock = sock;
 
@@ -70,8 +130,10 @@ async function startBaileys() {
         const msg = m.messages[0];
         if (!msg || msg.key.fromMe || !msg.message) return;
 
-        const remoteJid = msg.key.remoteJid;
-        console.log(`📩 [MENSAGEM RECEBIDA] De: ${remoteJid} | Chaves:`, Object.keys(msg.message));
+        // Resolve o problema de LIDs (números ocultos por conta de privacidade/multi-device)
+        const remoteJid = msg.key.remoteJidAlt || msg.key.remoteJid;
+        
+        console.log(`📩 [MENSAGEM RECEBIDA] De: ${remoteJid} (LID original: ${msg.key.remoteJid}) | Chaves:`, Object.keys(msg.message));
 
         let text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption;
 
@@ -108,6 +170,15 @@ async function startBaileys() {
 
         if (text && remoteJid) {
             console.log(`\n📲 [WHATSAPP RECEBIDO] De: ${remoteJid} -> "${text}"`);
+
+            // 🚀 VERIFICAÇÃO DE WHITELIST (BARREIRA DE SEGURANÇA)
+            const resolvedUser = await lookupUserOrClient(remoteJid);
+            if (!resolvedUser) {
+                console.log(`❌ [MENSAGEM BLOQUEADA] O número ${remoteJid} não está cadastrado em nenhuma empresa no Firestore. Mensagem ignorada.`);
+                return; // Para o fluxo aqui! O bot não responde nada e ignora.
+            }
+
+            console.log(`✅ [ACESSO PERMITIDO] Identificado: ${resolvedUser.displayName} (Empresa: ${resolvedUser.companyId} | Papel: ${resolvedUser.role})`);
 
             if (!global.waResponseModes) global.waResponseModes = new Map();
             const lowerText = text.trim().toLowerCase();
@@ -147,88 +218,78 @@ async function startBaileys() {
                 if (userHistory.length > 10) userHistory = userHistory.slice(-10);
                 global.waChatHistory.set(remoteJid, userHistory);
 
-                // Chama o endpoint local do NORA Flow via HTTP (porta 3000 do Next.js)
-                const nextPort = process.env.PORT || 3000;
-                const req = http.request({
-                    hostname: 'localhost',
-                    port: nextPort,
-                    path: '/api/xcot',
+                // Chama o endpoint da NORA (URL de Produção ou Local)
+                const targetApiUrl = process.env.NORA_API_URL 
+                    ? `${process.env.NORA_API_URL.replace(/\/$/, '')}/api/xcot` 
+                    : `http://localhost:${process.env.PORT || 3000}/api/xcot`;
+
+                console.log(`🤖 [CHAMANDO NORA AI] Target: ${targetApiUrl}`);
+
+                const fetchOptions = {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                }, (res) => {
-                    let data = '';
-                    res.on('data', chunk => data += chunk);
-                    res.on('end', async () => {
-                        try {
-                            const parsed = JSON.parse(data);
-                            const responseText = parsed.response || 'Desculpe, ocorreu um erro ao processar.';
-                            
-                            // Adiciona resposta da NORA ao histórico da conversa
-                            userHistory.push({ role: 'assistant', content: responseText });
-                            if (userHistory.length > 10) userHistory = userHistory.slice(-10);
-                            global.waChatHistory.set(remoteJid, userHistory);
-
-                            // Formata o texto para WhatsApp
-                            const cleanText = responseText
-                                .replace(/\[\[ azul: (.*?) \]\]/g, '*$1*')
-                                .replace(/\*\*(.*?)\*\*/g, '*$1*');
-
-                            const currentMode = global.waResponseModes.get(remoteJid) || 'auto';
-                            const isIncomingAudio = hasAudio;
-                            const shouldSendVoice = (currentMode === 'voice' || currentMode === 'both' || (currentMode === 'auto' && isIncomingAudio));
-                            const shouldSendText = (currentMode === 'text' || currentMode === 'both' || (currentMode === 'auto' && !isIncomingAudio));
-
-                            // 1. Envia resposta em Texto se aplicável
-                            if (shouldSendText) {
-                                await sock.sendMessage(remoteJid, { text: cleanText });
-                                console.log(`🤖 [NORA TEXTO RESPONSES] Enviado para ${remoteJid}`);
-                            }
-
-                            // 2. Envia resposta em Nota de Voz (Áudio PTT) se aplicável
-                            if (shouldSendVoice) {
-                                console.log(`🎙️ [ENVIANDO NOTA DE VOZ] Sintetizando voz da NORA para ${remoteJid}...`);
-                                try {
-                                    await sock.sendPresenceUpdate('recording', remoteJid);
-                                    const voiceBuffer = await textToSpeechBuffer(responseText, 'Elias');
-                                    if (voiceBuffer) {
-                                        await sock.sendMessage(remoteJid, {
-                                            audio: voiceBuffer,
-                                            mimetype: 'audio/ogg; codecs=opus',
-                                            ptt: true
-                                        });
-                                        console.log(`🎙️ [NORA VOZ RESPONSES] Nota de voz entregue para ${remoteJid}`);
-                                    } else if (!shouldSendText) {
-                                        // Se falhou o áudio e não tinha enviado texto, envia o texto como fallback
-                                        await sock.sendMessage(remoteJid, { text: cleanText });
-                                    }
-                                } catch (voiceErr) {
-                                    console.error("Erro ao enviar resposta de voz:", voiceErr);
-                                    if (!shouldSendText) {
-                                        await sock.sendMessage(remoteJid, { text: cleanText });
-                                    }
-                                }
-                            }
-                        } catch (e) {
-                            console.error('Erro ao ler resposta da NORA:', e);
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: userHistory,
+                        userContext: {
+                            uid: `wa_${remoteJid.split('@')[0]}`,
+                            companyId: resolvedUser.companyId,
+                            companyName: 'NORA Parceiro', // Este campo poderia ser buscado se necessário
+                            role: resolvedUser.role,
+                            displayName: resolvedUser.displayName,
+                            currentPath: '/whatsapp'
                         }
-                    });
-                });
+                    })
+                };
 
-                const contactName = msg.pushName && !/^\d+$/.test(msg.pushName) ? msg.pushName : 'Elias';
+                const noraResponse = await fetch(targetApiUrl, fetchOptions);
+                const parsed = await noraResponse.json();
+                const responseText = parsed.response || 'Desculpe, ocorreu um erro ao processar.';
 
-                req.on('error', (e) => console.error('Erro na requisição para /api/xcot:', e.message));
-                req.write(JSON.stringify({
-                    messages: userHistory,
-                    userContext: {
-                        uid: `wa_${remoteJid.split('@')[0]}`,
-                        companyId: 'Z6XlJobG4TfPoYMwLNC0',
-                        companyName: 'ESP-TEC INSTALAÇÕES LTDA.',
-                        role: 'admin',
-                        displayName: contactName,
-                        currentPath: '/whatsapp'
+                // Adiciona resposta da NORA ao histórico da conversa
+                userHistory.push({ role: 'assistant', content: responseText });
+                if (userHistory.length > 10) userHistory = userHistory.slice(-10);
+                global.waChatHistory.set(remoteJid, userHistory);
+
+                // Formata o texto para WhatsApp
+                const cleanText = responseText
+                    .replace(/\[\[ azul: (.*?) \]\]/g, '*$1*')
+                    .replace(/\*\*(.*?)\*\*/g, '*$1*');
+
+                const currentMode = global.waResponseModes.get(remoteJid) || 'auto';
+                const isIncomingAudio = hasAudio;
+                const shouldSendVoice = (currentMode === 'voice' || currentMode === 'both' || (currentMode === 'auto' && isIncomingAudio));
+                const shouldSendText = (currentMode === 'text' || currentMode === 'both' || (currentMode === 'auto' && !isIncomingAudio));
+
+                // 1. Envia resposta em Texto se aplicável
+                if (shouldSendText) {
+                    await sock.sendMessage(remoteJid, { text: cleanText });
+                    console.log(`🤖 [NORA TEXTO RESPONSES] Enviado para ${remoteJid}`);
+                }
+
+                // 2. Envia resposta em Nota de Voz (Áudio PTT) se aplicável
+                if (shouldSendVoice) {
+                    console.log(`🎙️ [ENVIANDO NOTA DE VOZ] Sintetizando voz da NORA para ${remoteJid}...`);
+                    try {
+                        await sock.sendPresenceUpdate('recording', remoteJid);
+                        const voiceBuffer = await textToSpeechBuffer(responseText, 'Elias');
+                        if (voiceBuffer) {
+                            await sock.sendMessage(remoteJid, {
+                                audio: voiceBuffer,
+                                mimetype: 'audio/ogg; codecs=opus',
+                                ptt: true
+                            });
+                            console.log(`🎙️ [NORA VOZ RESPONSES] Nota de voz entregue para ${remoteJid}`);
+                        } else if (!shouldSendText) {
+                            await sock.sendMessage(remoteJid, { text: cleanText });
+                        }
+                    } catch (voiceErr) {
+                        console.error("Erro ao enviar resposta de voz:", voiceErr);
+                        if (!shouldSendText) {
+                            await sock.sendMessage(remoteJid, { text: cleanText });
+                        }
                     }
-                }));
-                req.end();
+                }
+                return;
 
             } catch (err) {
                 console.error('Erro ao enviar mensagem pelo WhatsApp:', err);
@@ -238,11 +299,53 @@ async function startBaileys() {
 }
 
 // Servidor HTTP simples na porta 8080 para fornecer o QR Code real em HTML
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.setHeader('Content-Type', 'application/json');
 
-    if (req.method === 'POST' && (req.url === '/send' || req.url === '/api/whatsapp/send')) {
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        return res.end();
+    }
+
+    if ((req.method === 'DELETE' || req.method === 'POST') && (req.url === '/logout' || req.url === '/reset')) {
+        try {
+            console.log('🔄 [LOGOUT/RESET] Solicitado resete da sessão do WhatsApp...');
+            if (globalSock) {
+                try { globalSock.logout(); } catch(e){}
+                try { globalSock.end(); } catch(e){}
+            }
+            connectionStatus = 'connecting';
+            latestQrCodeBase64 = null;
+            connectedPhone = null;
+
+            // Apaga as chaves antigas do Firestore
+            try {
+                const snapshot = await whatsappAuthCollection.get();
+                const batch = db.batch();
+                snapshot.docs.forEach((doc) => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                console.log('✅ Sessão removida do Firestore com sucesso.');
+            } catch (err) {
+                console.error('Erro ao deletar sessão do Firestore:', err);
+            }
+
+            setTimeout(() => {
+                startBaileys();
+            }, 1000);
+
+            res.writeHead(200);
+            return res.end(JSON.stringify({ success: true, message: 'Sessão resetada com sucesso. Novo QR Code será gerado.' }));
+        } catch (err) {
+            console.error('Erro ao resetar sessão:', err);
+            res.writeHead(500);
+            return res.end(JSON.stringify({ error: err.message }));
+        }
+    } else if (req.method === 'POST' && (req.url === '/send' || req.url === '/api/whatsapp/send')) {
         let body = '';
         req.on('data', chunk => body += chunk);
         req.on('end', async () => {
@@ -306,7 +409,54 @@ const server = http.createServer((req, res) => {
     }
 });
 
+async function startReminderPoller() {
+    setInterval(async () => {
+        if (!globalSock || connectionStatus !== 'open') return;
+        
+        try {
+            const now = new Date();
+            const snap = await db.collection('scheduled_messages').where('status', '==', 'pending').get();
+            
+            for (const doc of snap.docs) {
+                const data = doc.data();
+                if (!data.scheduledAt) continue;
+                
+                const scheduledDate = new Date(data.scheduledAt);
+                
+                if (scheduledDate <= now) {
+                    console.log(`⏰ [LEMBRETE] Disparando lembrete agendado para ${data.recipientName} (${data.phone})`);
+                    
+                    const cleanNumber = data.phone.replace(/\D/g, '');
+                    const formattedNumber = cleanNumber.startsWith('55') ? cleanNumber : `55${cleanNumber}`;
+                    let targetJid = `${formattedNumber}@s.whatsapp.net`;
+                    
+                    try {
+                        const results = await globalSock.onWhatsApp(formattedNumber);
+                        if (results && results.length > 0 && results[0].exists) {
+                            targetJid = results[0].jid;
+                        } else if (formattedNumber.length === 13 && formattedNumber.startsWith('55')) {
+                            const without9 = formattedNumber.slice(0, 4) + formattedNumber.slice(5);
+                            const altResults = await globalSock.onWhatsApp(without9);
+                            if (altResults && altResults.length > 0 && altResults[0].exists) {
+                                targetJid = altResults[0].jid;
+                            }
+                        }
+                    } catch(e) {}
+
+                    await globalSock.sendMessage(targetJid, { text: data.messageText });
+                    
+                    // Apaga da fila (delete) para manter a coleção limpa, ou marca como enviado
+                    await doc.ref.delete();
+                }
+            }
+        } catch (e) {
+            console.error('Erro no poller de lembretes:', e.message);
+        }
+    }, 60000); // Checa a cada 60 segundos
+}
+
 server.listen(8080, '0.0.0.0', () => {
     console.log('🚀 Servidor HTTP de QR Code e Envio de WhatsApp rodando em http://127.0.0.1:8080/qr');
     startBaileys();
+    startReminderPoller();
 });
