@@ -15,8 +15,8 @@ function convertMp3ToOpus(mp3Buffer) {
 
     try {
         fs.writeFileSync(inputPath, mp3Buffer);
-        // Aplica o filtro de áudio atempo=1.22 para a voz falar em ritmo mais rápido e fluído
-        execSync(`ffmpeg -y -i "${inputPath}" -af "atempo=1.22" -c:a libopus -b:a 32k -vbr on -ac 1 "${outputPath}"`, { stdio: 'ignore' });
+        // Aplica o filtro de áudio atempo=1.30 para a voz falar em ritmo mais rápido (1.30x)
+        execSync(`ffmpeg -y -i "${inputPath}" -af "atempo=1.30" -c:a libopus -b:a 32k -vbr on -ac 1 "${outputPath}"`, { stdio: 'ignore' });
         
         if (fs.existsSync(outputPath)) {
             const opusBuffer = fs.readFileSync(outputPath);
