@@ -187,7 +187,7 @@ async function startBaileys() {
                                     if (voiceBuffer) {
                                         await sock.sendMessage(remoteJid, {
                                             audio: voiceBuffer,
-                                            mimetype: 'audio/mp4',
+                                            mimetype: 'audio/ogg; codecs=opus',
                                             ptt: true
                                         });
                                         console.log(`🎙️ [NORA VOZ RESPONSES] Nota de voz entregue para ${remoteJid}`);
