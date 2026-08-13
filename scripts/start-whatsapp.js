@@ -76,6 +76,13 @@ async function startBaileys() {
                 // Envia sinal de digitando
                 await sock.sendPresenceUpdate('composing', remoteJid);
 
+                // Memória de histórico da conversa por remetente
+                if (!global.waChatHistory) global.waChatHistory = new Map();
+                let userHistory = global.waChatHistory.get(remoteJid) || [];
+                userHistory.push({ role: 'user', content: text });
+                if (userHistory.length > 10) userHistory = userHistory.slice(-10);
+                global.waChatHistory.set(remoteJid, userHistory);
+
                 // Chama o endpoint local do NORA Flow via HTTP
                 const req = http.request('http://localhost:3001/api/xcot', {
                     method: 'POST',
@@ -88,6 +95,11 @@ async function startBaileys() {
                             const parsed = JSON.parse(data);
                             const responseText = parsed.response || 'Desculpe, ocorreu um erro ao processar.';
                             
+                            // Adiciona resposta da NORA ao histórico da conversa
+                            userHistory.push({ role: 'assistant', content: responseText });
+                            if (userHistory.length > 10) userHistory = userHistory.slice(-10);
+                            global.waChatHistory.set(remoteJid, userHistory);
+
                             // Formata o texto para WhatsApp
                             const cleanText = responseText
                                 .replace(/\[\[ azul: (.*?) \]\]/g, '*$1*')
@@ -105,7 +117,7 @@ async function startBaileys() {
 
                 req.on('error', (e) => console.error('Erro na requisição para /api/xcot:', e.message));
                 req.write(JSON.stringify({
-                    messages: [{ role: 'user', content: text }],
+                    messages: userHistory,
                     userContext: {
                         uid: `wa_${remoteJid.split('@')[0]}`,
                         companyId: 'Z6XlJobG4TfPoYMwLNC0',
