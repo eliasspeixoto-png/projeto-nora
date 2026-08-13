@@ -161,13 +161,32 @@ const server = http.createServer((req, res) => {
 
                 const cleanNumber = number.replace(/\D/g, '');
                 const formattedNumber = cleanNumber.startsWith('55') ? cleanNumber : `55${cleanNumber}`;
-                const jid = `${formattedNumber}@s.whatsapp.net`;
+                let targetJid = `${formattedNumber}@s.whatsapp.net`;
 
-                await globalSock.sendMessage(jid, { text });
-                console.log(`🚀 [DISPARO DIRETO] Mensagem enviada para ${jid}: "${text}"`);
+                // Consulta os servidores do WhatsApp para resolver o JID oficial (com ou sem o 9º dígito)
+                try {
+                    const results = await globalSock.onWhatsApp(formattedNumber);
+                    if (results && results.length > 0 && results[0].exists) {
+                        targetJid = results[0].jid;
+                        console.log(`📱 [JID RESOLVIDO] ${formattedNumber} -> JID oficial WhatsApp: ${targetJid}`);
+                    } else if (formattedNumber.length === 13 && formattedNumber.startsWith('55')) {
+                        // Tenta remover o 9º dígito se a primeira tentativa falhar
+                        const without9 = formattedNumber.slice(0, 4) + formattedNumber.slice(5);
+                        const altResults = await globalSock.onWhatsApp(without9);
+                        if (altResults && altResults.length > 0 && altResults[0].exists) {
+                            targetJid = altResults[0].jid;
+                            console.log(`📱 [JID RESOLVIDO ALT] ${without9} -> JID oficial WhatsApp: ${targetJid}`);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Aviso ao consultar onWhatsApp:', e.message);
+                }
+
+                await globalSock.sendMessage(targetJid, { text });
+                console.log(`🚀 [DISPARO DIRETO] Mensagem entregue no WhatsApp para ${targetJid}: "${text}"`);
                 
                 res.writeHead(200);
-                res.end(JSON.stringify({ success: true, jid }));
+                res.end(JSON.stringify({ success: true, jid: targetJid }));
             } catch (err) {
                 console.error('Erro no envio de mensagem via /send:', err);
                 res.writeHead(500);
