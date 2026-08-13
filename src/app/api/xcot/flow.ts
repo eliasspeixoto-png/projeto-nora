@@ -35,9 +35,8 @@ import {
     createSupplierAdmin,
     createVehicleAdmin,
     createToolAdmin,
-    getProductsAdmin,
-    bulkUpdateClientsAdmin
 } from '@/lib/firebase/admin-db';
+import { sendWhatsappMessage } from '@/lib/whatsapp/evolution-client';
 
 
 const NoraFlowInputSchema = z.object({
@@ -487,11 +486,22 @@ const tools = [
                   term: { type: 'string', description: 'Nome ou Código do cliente para identificar qual será atualizado.' },
                   data: { type: 'object', description: 'Objeto com os campos a serem alterados (ex: { isComodato: true, serviceValue: 500 }).' }
                 },
-                required: ['term', 'data']
-              }
-            }
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'send_whatsapp_message',
+        description: 'Envia uma mensagem de WhatsApp real para um funcionário, cliente ou contato da empresa.',
+        parameters: {
+          type: 'object',
+          properties: {
+            recipientName: { type: 'string', description: 'Nome da pessoa/destinatário (ex: "Veridiana", "Danilo", "Elias" ou nome do cliente).' },
+            phone: { type: 'string', description: 'Número de telefone do destinatário se souber. Se não informado, a NORA buscará o telefone no cadastro.' },
+            messageText: { type: 'string', description: 'O texto/mensagem exato a ser enviado para a pessoa via WhatsApp.' }
           },
-          required: ['updates']
+          required: ['recipientName', 'messageText']
         }
       }
     }
@@ -509,6 +519,47 @@ async function executeTool(toolCall: any, context: any) {
 
   try {
     switch (name) {
+      case 'send_whatsapp_message': {
+        let targetPhone = args.phone ? args.phone.replace(/\D/g, '') : '';
+
+        if (!targetPhone) {
+          const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normRecipient = normalize(args.recipientName || '');
+          const usersList = await getDetailedListAdmin(companyId, 'funcionarios');
+          const matchedUser: any = usersList.find((u: any) => normalize(u.nome || '').includes(normRecipient));
+
+          if (matchedUser && matchedUser.fone) {
+            targetPhone = matchedUser.fone.replace(/\D/g, '');
+          } else {
+            const clientMatch: any = await searchClientByCodeOrNameAdmin(companyId, args.recipientName);
+            if (clientMatch && clientMatch.phone) {
+              targetPhone = clientMatch.phone.replace(/\D/g, '');
+            }
+          }
+        }
+
+        if (!targetPhone) {
+          return { error: `Não localizei o telefone de "${args.recipientName}". Por favor, me informe o número com DDD.` };
+        }
+
+        try {
+          const sendRes = await fetch('http://localhost:8080/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ number: targetPhone, text: args.messageText })
+          });
+          const sendData = await sendRes.json();
+          if (sendData.success) {
+            return { success: true, message: `Mensagem enviada com sucesso no WhatsApp para ${args.recipientName} (${targetPhone})!` };
+          }
+        } catch (e: any) {
+          console.error("Erro ao enviar mensagem via Baileys local:", e.message);
+        }
+
+        await sendWhatsappMessage(`NORA_${companyId}`, targetPhone, args.messageText);
+        return { success: true, message: `Mensagem enviada com sucesso no WhatsApp para ${args.recipientName}!` };
+      }
+
       case 'get_company_status':
         if (isClient) return { error: 'Esta visão geral é administrativa. Como suporte ao cliente, posso te informar sobre o status dos seus pedidos ou agendar uma visita técnica.' };
         const type = args.type || args.status_type;

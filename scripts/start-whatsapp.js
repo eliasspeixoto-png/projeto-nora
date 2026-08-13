@@ -141,7 +141,38 @@ const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');
 
-    if (req.url === '/qr' || req.url === '/api/whatsapp/qr') {
+    if (req.method === 'POST' && (req.url === '/send' || req.url === '/api/whatsapp/send')) {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', async () => {
+            try {
+                const { number, text } = JSON.parse(body);
+                if (!number || !text) {
+                    res.writeHead(400);
+                    return res.end(JSON.stringify({ error: 'Parâmetros "number" e "text" são obrigatórios.' }));
+                }
+
+                if (!sock || connectionStatus !== 'open') {
+                    res.writeHead(503);
+                    return res.end(JSON.stringify({ error: 'WhatsApp não está conectado no momento.' }));
+                }
+
+                const cleanNumber = number.replace(/\D/g, '');
+                const formattedNumber = cleanNumber.startsWith('55') ? cleanNumber : `55${cleanNumber}`;
+                const jid = `${formattedNumber}@s.whatsapp.net`;
+
+                await sock.sendMessage(jid, { text });
+                console.log(`🚀 [DISPARO DIRETO] Mensagem enviada para ${jid}: "${text}"`);
+                
+                res.writeHead(200);
+                res.end(JSON.stringify({ success: true, jid }));
+            } catch (err) {
+                console.error('Erro no envio de mensagem via /send:', err);
+                res.writeHead(500);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+    } else if (req.url === '/qr' || req.url === '/api/whatsapp/qr') {
         res.writeHead(200);
         res.end(JSON.stringify({
             connected: connectionStatus === 'open',
