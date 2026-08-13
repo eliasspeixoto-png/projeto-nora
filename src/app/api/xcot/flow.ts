@@ -618,24 +618,36 @@ async function executeTool(toolCall: any, context: any) {
         
         const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
         const targetNormalized = normalize(searchStr);
+
+        const getFullProductText = (p: any) => normalize(`
+            ${p.item || ''} 
+            ${p.description || ''} 
+            ${p.detailedDescription || ''} 
+            ${p.code || ''} 
+            ${p.ean || ''} 
+            ${p.codigoBarras || ''} 
+            ${p.codigo || ''} 
+            ${p.model || ''} 
+            ${p.manufacturer || ''} 
+            ${p.name || ''} 
+            ${p.title || ''}
+        `);
         
         let filtered = allProds.filter((p: any) => {
-            const desc = normalize(p.description || '');
-            const code = normalize(p.item || '');
-            return desc.includes(targetNormalized) || code.includes(targetNormalized);
+            const text = getFullProductText(p);
+            return text.includes(targetNormalized);
         });
 
         // Se não achou nada com a string inteira, tenta quebrar em termos (AND logic)
         if (filtered.length === 0) {
-            const commonCategoryWords = ['central', 'choque', 'jfl', 'intelbras', 'eletrificador', 'cerca', 'eletrica', 'produto'];
+            const commonCategoryWords = ['central', 'choque', 'jfl', 'intelbras', 'eletrificador', 'cerca', 'eletrica', 'produto', 'camera', 'mini'];
             const terms = searchStr.split(' ').map((t: string) => normalize(t)).filter((t: string) => t.length > 1);
             
             if (terms.length > 0) {
                 // Primeira tentativa: todos os termos
                 filtered = allProds.filter((p: any) => {
-                    const desc = normalize(p.description || '');
-                    const code = normalize(p.item || '');
-                    return terms.every((t: string) => desc.includes(t) || code.includes(t));
+                    const text = getFullProductText(p);
+                    return terms.every((t: string) => text.includes(t));
                 });
                 
                 // Segunda tentativa: se não achou nada, remove palavras de categoria e tenta de novo (prioriza modelo)
@@ -643,21 +655,18 @@ async function executeTool(toolCall: any, context: any) {
                     const modelTerms = terms.filter((t: string) => !commonCategoryWords.includes(t));
                     if (modelTerms.length > 0) {
                         filtered = allProds.filter((p: any) => {
-                            const desc = normalize(p.description || '');
-                            const code = normalize(p.item || '');
-                            return modelTerms.every((t: string) => desc.includes(t) || code.includes(t));
+                            const text = getFullProductText(p);
+                            return modelTerms.every((t: string) => text.includes(t));
                         });
                     }
                 }
             }
         }
 
-
-
         return filtered.slice(0, 15).map((p: any) => ({
             id: p.id,
-            description: p.description,
-            item: p.item,
+            description: p.description || p.detailedDescription || p.name || p.title || 'Produto sem descrição',
+            item: p.item || p.ean || p.code || p.codigoBarras || p.codigo || '',
             sellingPrice: p.sellingPrice || 0,
             unit: p.unit || 'UNID',
             stockQuantity: p.stockQuantity || 0
