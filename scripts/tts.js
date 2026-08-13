@@ -59,13 +59,13 @@ function cleanTextForSpeech(text, firstName = 'Elias') {
         clean = `${firstName}, ${clean}`;
     }
 
-    // Substitui pontuações por vírgulas suaves (evita que a sintetizadora fale a palavra "ponto")
+    // Preserva o ponto de interrogação (?) para a sintetizadora fazer a entonação perfeita de pergunta!
     clean = clean
         .replace(/\./g, ', ')
-        .replace(/\?/g, ', ')
         .replace(/!/g, ', ')
         .replace(/:\s*/g, ', ')
         .replace(/,\s*,/g, ',')
+        .replace(/\s*\?\s*/g, '? ')
         .replace(/\s+/g, ' ')
         .trim();
 
