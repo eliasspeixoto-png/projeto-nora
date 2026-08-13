@@ -101,6 +101,8 @@ async function startBaileys() {
                     });
                 });
 
+                const contactName = msg.pushName && !/^\d+$/.test(msg.pushName) ? msg.pushName : 'Elias';
+
                 req.on('error', (e) => console.error('Erro na requisição para /api/xcot:', e.message));
                 req.write(JSON.stringify({
                     messages: [{ role: 'user', content: text }],
@@ -109,7 +111,7 @@ async function startBaileys() {
                         companyId: 'DEFAULT_COMPANY',
                         companyName: 'NORA Segurança',
                         role: 'admin',
-                        displayName: remoteJid.split('@')[0],
+                        displayName: contactName,
                         currentPath: '/whatsapp'
                     }
                 }));
