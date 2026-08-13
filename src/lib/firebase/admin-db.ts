@@ -67,15 +67,19 @@ export const getCollectionStatsAdmin = async (companyId: string, collectionName:
         }
     }
 
-    let snap = await query.count().get();
-    let count = snap.data().count;
+    let snap = await query.get();
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(d => !d.deletedAt);
 
-    if (count === 0) {
-        const fallbackSnap = await firestore.collection(targetColl).count().get();
-        count = fallbackSnap.data().count;
+    if (docs.length === 0) {
+        const fallbackSnap = await firestore.collection(targetColl).get();
+        docs = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(d => !d.deletedAt);
     }
 
-    return { count };
+    if (targetColl === USERS_COLLECTION) {
+        docs = docs.filter(d => d.role !== 'cliente' && d.userType !== 'cliente');
+    }
+
+    return { count: docs.length };
 };
 
 export const getFinancialSummaryAdmin = async (companyId: string) => {
@@ -225,6 +229,10 @@ export const getDetailedListAdmin = async (companyId: string, collectionName: st
         }
     }
 
+    if (targetColl === USERS_COLLECTION) {
+        docs = docs.filter(d => d.role !== 'cliente' && d.userType !== 'cliente');
+    }
+
     return docs.map(d => {
         // Simplified return for the AI to handle tokens better
         if (targetColl === CLIENTS_COLLECTION) return { nome: d.name, codigo: d.clientCode, fone: d.phone };
@@ -232,6 +240,7 @@ export const getDetailedListAdmin = async (companyId: string, collectionName: st
         if (targetColl === QUOTES_COLLECTION) return { numero: d.quoteNumber, cliente: d.clientName, total: d.total, status: d.status, tecnico: d.assignedTechnicianName };
         if (targetColl === VISITS_COLLECTION) return { numero: d.visitNumber, cliente: d.clientName, status: d.status, data: d.visitDate, tecnico: d.technicianName };
         if (targetColl === ACCOUNTS_RECEIVABLE_COLLECTION) return { cliente: d.clientName, valor: d.amount, vencimento: d.dueDate, status: d.status, os: d.quoteNumber };
+        if (targetColl === USERS_COLLECTION) return { nome: d.displayName || d.name, cargo: d.role, email: d.email, fone: d.phone };
         return d;
     });
 };
