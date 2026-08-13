@@ -667,10 +667,15 @@ async function executeTool(toolCall: any, context: any) {
         return filtered.slice(0, 15).map((p: any) => ({
             id: p.id,
             description: p.description || p.detailedDescription || p.name || p.title || 'Produto sem descrição',
+            detailedDescription: p.detailedDescription || '',
             item: p.item || p.ean || p.code || p.codigoBarras || p.codigo || '',
             sellingPrice: p.sellingPrice || 0,
+            materialPrice: p.materialPrice || 0,
             unit: p.unit || 'UNID',
-            stockQuantity: p.stockQuantity || 0
+            stockQuantity: p.stockQuantity || 0,
+            distributor: p.distributor || p.DISTRIBUIDOR || p.fornecedor || '',
+            manufacturer: p.manufacturer || p.marca || '',
+            model: p.model || ''
         }));
 
 
