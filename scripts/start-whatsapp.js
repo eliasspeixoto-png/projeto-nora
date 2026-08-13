@@ -183,7 +183,7 @@ async function startBaileys() {
                                 console.log(`🎙️ [ENVIANDO NOTA DE VOZ] Sintetizando voz da NORA para ${remoteJid}...`);
                                 try {
                                     await sock.sendPresenceUpdate('recording', remoteJid);
-                                    const voiceBuffer = await textToSpeechBuffer(responseText);
+                                    const voiceBuffer = await textToSpeechBuffer(responseText, 'Elias');
                                     if (voiceBuffer) {
                                         await sock.sendMessage(remoteJid, {
                                             audio: voiceBuffer,

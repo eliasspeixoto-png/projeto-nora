@@ -33,27 +33,39 @@ function convertMp3ToOpus(mp3Buffer) {
 }
 
 /**
- * Limpa o texto para fala humana perfeita: remove emojis, markdown, símbolos e barras.
+ * Limpa o texto para fala humana perfeita: insere nome do usuario no inicio, pausas em virgulas e remove simbolos.
  */
-function cleanTextForSpeech(text) {
+function cleanTextForSpeech(text, firstName = 'Elias') {
     if (!text) return '';
 
-    return text
-        // Remove tags customizadas como [[ azul: ... ]]
+    let clean = text
         .replace(/\[\[.*?\]\]/g, '')
-        // Remove URLs
         .replace(/https?:\/\/\S+/g, '')
-        // Remove todos os emojis (faixa unicode completa de emojis)
         .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-        // Remove delimitadores de tabelas e listas
         .replace(/\|/g, ' ')
-        // Remove caracteres de markdown (*, _, ~, `, #, ^, -)
         .replace(/[*_~`#^]/g, '')
-        // Substitui hífens por espaço para evitar leitura literal
         .replace(/-/g, ' ')
-        // Limpa espaços extras
         .replace(/\s+/g, ' ')
         .trim();
+
+    if (!clean) return '';
+
+    // Garante que o áudio comece citando primeiro o nome do usuário
+    if (firstName && !clean.toLowerCase().startsWith(firstName.toLowerCase())) {
+        clean = `${firstName}, ${clean}`;
+    }
+
+    // Insere pausas suaves de respiração natural nas vírgulas e pontuações
+    clean = clean
+        .replace(/,/g, ', ... ')
+        .replace(/\./g, '. ... ')
+        .replace(/\?/g, '? ... ')
+        .replace(/!/g, '! ... ')
+        .replace(/:\s*/g, ': ... ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return clean;
 }
 
 /**
@@ -62,10 +74,10 @@ function cleanTextForSpeech(text) {
  * @param {string} text Texto a ser convertido em voz.
  * @returns {Promise<Buffer|null>} Buffer do áudio gerado.
  */
-async function textToSpeechBuffer(text) {
+async function textToSpeechBuffer(text, firstName = 'Elias') {
     if (!text) return null;
 
-    const cleanText = cleanTextForSpeech(text);
+    const cleanText = cleanTextForSpeech(text, firstName);
     if (!cleanText) return null;
 
     try {
