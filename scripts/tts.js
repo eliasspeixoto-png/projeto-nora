@@ -58,6 +58,7 @@ function cleanTextForSpeech(text) {
 
 /**
  * Gera um buffer de áudio nativo OGG/OPUS a partir de um texto em português brasileiro.
+ * Suporta textos longos (respostas técnicas) fatiando em múltiplos trechos sintetizados.
  * @param {string} text Texto a ser convertido em voz.
  * @returns {Promise<Buffer|null>} Buffer do áudio gerado.
  */
@@ -67,24 +68,30 @@ async function textToSpeechBuffer(text) {
     const cleanText = cleanTextForSpeech(text);
     if (!cleanText) return null;
 
-    const shortText = cleanText.length > 300 ? cleanText.substring(0, 300) + '...' : cleanText;
-
     try {
-        const audioUrl = googleTTS.getAudioUrl(shortText, {
+        // Usa getAllAudioUrls para fatiar textos longos em trechos de ate 200 caracteres
+        const audioUrls = googleTTS.getAllAudioUrls(cleanText, {
             lang: 'pt-BR',
             slow: false,
             host: 'https://translate.google.com',
             timeout: 10000,
         });
 
-        const res = await fetch(audioUrl);
-        if (res.ok) {
-            const arrayBuffer = await res.arrayBuffer();
-            const mp3Buffer = Buffer.from(arrayBuffer);
-            return convertMp3ToOpus(mp3Buffer);
+        const mp3Buffers = [];
+        for (const item of audioUrls) {
+            const res = await fetch(item.url);
+            if (res.ok) {
+                const arrayBuffer = await res.arrayBuffer();
+                mp3Buffers.push(Buffer.from(arrayBuffer));
+            }
+        }
+
+        if (mp3Buffers.length > 0) {
+            const combinedMp3 = Buffer.concat(mp3Buffers);
+            return convertMp3ToOpus(combinedMp3);
         }
     } catch (err) {
-        console.error("Erro ao gerar áudio TTS:", err.message);
+        console.error("Erro ao gerar áudio TTS para texto longo:", err.message);
     }
 
     return null;

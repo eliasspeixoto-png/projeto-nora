@@ -113,22 +113,22 @@ async function startBaileys() {
             const lowerText = text.trim().toLowerCase();
 
             // Comandos rápidos de alteração do Modo de Resposta
-            if (lowerText === 'modo voz' || lowerText === 'responder por voz' || lowerText === 'ativar voz') {
+            if (/\b(modo\s*voz|responder\s*por\s*voz|ativar\s*voz|responda\s*modo\s*voz|modo\s*de\s*voz)\b/i.test(lowerText)) {
                 global.waResponseModes.set(remoteJid, 'voice');
-                await sock.sendMessage(remoteJid, { text: "🔊 *Modo Voz Ativado!* A partir de agora vou te responder com notas de voz no WhatsApp." });
+                await sock.sendMessage(remoteJid, { text: "🔊 *Modo Voz Ativado!* A partir de agora vou te responder sempre por notas de voz no WhatsApp." });
                 return;
             }
-            if (lowerText === 'modo texto' || lowerText === 'responder por texto' || lowerText === 'ativar texto') {
+            if (/\b(modo\s*texto|responder\s*por\s*texto|ativar\s*texto|responda\s*modo\s*texto|modo\s*de\s*texto)\b/i.test(lowerText)) {
                 global.waResponseModes.set(remoteJid, 'text');
-                await sock.sendMessage(remoteJid, { text: "📝 *Modo Texto Ativado!* A partir de agora vou te responder por mensagens de texto." });
+                await sock.sendMessage(remoteJid, { text: "📝 *Modo Texto Ativado!* A partir de agora vou te responder sempre por mensagens de texto." });
                 return;
             }
-            if (lowerText === 'modo auto' || lowerText === 'modo automatico') {
+            if (/\b(modo\s*auto|modo\s*automatico)\b/i.test(lowerText)) {
                 global.waResponseModes.set(remoteJid, 'auto');
                 await sock.sendMessage(remoteJid, { text: "⚡ *Modo Automático Ativado!* Vou responder por voz quando você mandar áudio, e por texto quando você mandar mensagem." });
                 return;
             }
-            if (lowerText === 'modo ambos') {
+            if (/\b(modo\s*ambos)\b/i.test(lowerText)) {
                 global.waResponseModes.set(remoteJid, 'both');
                 await sock.sendMessage(remoteJid, { text: "🎙️📝 *Modo Ambos Ativado!* Vou te enviar a resposta em texto e a nota de voz simultaneamente." });
                 return;
