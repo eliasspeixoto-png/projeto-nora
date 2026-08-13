@@ -528,6 +528,44 @@ export const createClientAdmin = async (companyId: string, data: any) => {
     return { id: docRef.id, clientCode };
 };
 
+export const createTeamMemberAdmin = async (companyId: string, data: any) => {
+    const snap = await firestore.collection(USERS_COLLECTION).where("companyId", "==", companyId).get();
+    
+    // Antiduplicidade: Verificar Nome, Telefone ou Email
+    const nameNormalized = normalizeString(data.displayName || data.name || "");
+    const phoneClean = (data.phone || "").replace(/\D/g, "");
+    const emailClean = (data.email || "").toLowerCase().trim();
+
+    const duplicate = snap.docs.find(d => {
+        const dData = d.data();
+        const dName = normalizeString(dData.displayName || dData.name || "");
+        const dPhone = (dData.phone || "").replace(/\D/g, "");
+        const dEmail = (dData.email || "").toLowerCase().trim();
+
+        return (nameNormalized && dName === nameNormalized) || 
+               (phoneClean && dPhone === phoneClean) ||
+               (emailClean && dEmail === emailClean);
+    });
+
+    if (duplicate) {
+        const dData = duplicate.data();
+        throw new Error(`COLABORADOR_DUPLICADO: Já existe um cadastro para "${dData.displayName || dData.name}".`);
+    }
+
+    const docRef = await firestore.collection(USERS_COLLECTION).add({
+        companyId,
+        role: data.role || 'tecnico',
+        displayName: data.displayName || data.name || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        userType: 'freelancer', // default se vier via bot para freelancers
+        status: 'Ativo',
+        createdAt: getBrasiliaDate().toISOString(),
+        isOnline: false
+    });
+    return { id: docRef.id, displayName: data.displayName || data.name };
+};
+
 export const createQuoteAdmin = async (companyId: string, data: any) => {
     const year = getBrasiliaDate().getFullYear().toString().slice(-2);
     const isComodato = data.isComodato || data.serviceType === 'Comodato' || !!data.comodatoType;

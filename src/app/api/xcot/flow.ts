@@ -40,7 +40,8 @@ import {
     addObservationAdmin,
     searchObservationsAdmin,
     scheduleMessageAdmin,
-    searchTeamMemberAdmin
+    searchTeamMemberAdmin,
+    createTeamMemberAdmin
 } from '@/lib/firebase/admin-db';
 import { firestore } from '@/lib/firebase/admin';
 import { sendWhatsappMessage } from '@/lib/whatsapp/evolution-client';
@@ -422,6 +423,23 @@ const tools = [
           preventiveMaintenanceFrequency: { type: 'number', description: 'Frequência da preventiva em meses.' },
           portalAccess: { type: 'boolean', description: 'Se o cliente terá acesso ao portal.' },
           notes: { type: 'string', description: 'Observações adicionais.' }
+        },
+        required: ['name']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_team_member',
+      description: 'Cadastra um novo funcionário ou freelancer na base de usuários (coleção "users"). Chame esta ferramenta para adicionar membros à equipe.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Nome completo do funcionário/freelancer.' },
+          phone: { type: 'string', description: 'Telefone do funcionário/freelancer.' },
+          email: { type: 'string', description: 'E-mail do funcionário/freelancer.' },
+          role: { type: 'string', description: 'Função ou cargo (ex: tecnico, freelancer, admin).' }
         },
         required: ['name']
       }
@@ -819,6 +837,9 @@ async function executeTool(toolCall: any, context: any) {
         }
         return await createClientAdmin(companyId, args);
 
+      case 'create_team_member':
+        return await createTeamMemberAdmin(companyId, args);
+
       case 'create_visit':
         return await createVisitAdmin(companyId, args);
 
@@ -1065,7 +1086,7 @@ SUA PERSONA: NORA Sovereign Operational Commander (Rainha do PROJETO NORA).
 Sua missão é ser a comandante suprema do sistema, gerindo 100% das operações da ${companyName} com autoridade total, precisão absoluta e confiabilidade máxima.
 
 AUTORIDADE OPERACIONAL E GOVERNANÇA:
-- **Poderes Totais:** Você tem autoridade total para consultar, cadastrar, atualizar produtos, alterar valores, preencher orçamentos, agendar visitas e gerir clientes.
+- **Poderes Totais:** Você tem autoridade total para consultar, cadastrar, atualizar produtos, alterar valores, preencher orçamentos, agendar visitas e gerir clientes e FUNCIONÁRIOS/FREELANCERS.
 - **Segurança de Exclusão:** Você NÃO pode excluir nenhum registro sem a permissão explícita do usuário em duas etapas. Se solicitarem exclusão, peça confirmação primeiro.
 - **Cadastros em Lote:** Processe tabelas, planilhas e dados copiados em lote com 'bulk_update_clients'.
 - **Confiança e Veracidade:** Você NUNCA inventa dados. Se faltar algum dado, consulte o banco de dados via tool ou solicite o dado exato ao usuário.
