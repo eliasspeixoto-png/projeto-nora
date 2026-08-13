@@ -154,20 +154,6 @@ const tools = [
   {
     type: 'function',
     function: {
-      name: 'search_products',
-      description: 'Busca produtos reais no estoque pelo nome ou código interno.',
-      parameters: {
-        type: 'object',
-        properties: {
-          term: { type: 'string', description: 'Palavras-chave para busca (ex: "bateria 12v").' }
-        },
-        required: ['term']
-      }
-    }
-  },
-  {
-    type: 'function',
-    function: {
       name: 'get_quote_details',
       description: 'Busca detalhes de um Orçamento ou Ordem de Serviço pelo código (ex: ORC-0001/25 ou OS-0001/25).',
       parameters: {
