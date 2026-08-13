@@ -67,8 +67,15 @@ export const getCollectionStatsAdmin = async (companyId: string, collectionName:
         }
     }
 
-    const snap = await query.count().get();
-    return { count: snap.data().count };
+    let snap = await query.count().get();
+    let count = snap.data().count;
+
+    if (count === 0) {
+        const fallbackSnap = await firestore.collection(targetColl).count().get();
+        count = fallbackSnap.data().count;
+    }
+
+    return { count };
 };
 
 export const getFinancialSummaryAdmin = async (companyId: string) => {
@@ -207,19 +214,26 @@ export const getDetailedListAdmin = async (companyId: string, collectionName: st
         else query = query.where("clientId", "==", clientId);
     }
     
-    const snap = await query.get();
-    return snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as any))
-        .filter(d => !d.deletedAt)
-        .map(d => {
-            // Simplified return for the AI to handle tokens better
-            if (targetColl === CLIENTS_COLLECTION) return { nome: d.name, codigo: d.clientCode, fone: d.phone };
-            if (targetColl === PRODUCTS_COLLECTION) return { nome: d.description, codigo: d.item, estoque: d.stockQuantity };
-            if (targetColl === QUOTES_COLLECTION) return { numero: d.quoteNumber, cliente: d.clientName, total: d.total, status: d.status, tecnico: d.assignedTechnicianName };
-            if (targetColl === VISITS_COLLECTION) return { numero: d.visitNumber, cliente: d.clientName, status: d.status, data: d.visitDate, tecnico: d.technicianName };
-            if (targetColl === ACCOUNTS_RECEIVABLE_COLLECTION) return { cliente: d.clientName, valor: d.amount, vencimento: d.dueDate, status: d.status, os: d.quoteNumber };
-            return d;
-        });
+    let snap = await query.get();
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(d => !d.deletedAt);
+
+    if (docs.length === 0) {
+        const fallbackSnap = await firestore.collection(targetColl).get();
+        docs = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(d => !d.deletedAt);
+        if (statusFilter) {
+            docs = docs.filter(d => d.status?.toLowerCase() === statusFilter.toLowerCase());
+        }
+    }
+
+    return docs.map(d => {
+        // Simplified return for the AI to handle tokens better
+        if (targetColl === CLIENTS_COLLECTION) return { nome: d.name, codigo: d.clientCode, fone: d.phone };
+        if (targetColl === PRODUCTS_COLLECTION) return { nome: d.description || d.name, codigo: d.item, estoque: d.stockQuantity };
+        if (targetColl === QUOTES_COLLECTION) return { numero: d.quoteNumber, cliente: d.clientName, total: d.total, status: d.status, tecnico: d.assignedTechnicianName };
+        if (targetColl === VISITS_COLLECTION) return { numero: d.visitNumber, cliente: d.clientName, status: d.status, data: d.visitDate, tecnico: d.technicianName };
+        if (targetColl === ACCOUNTS_RECEIVABLE_COLLECTION) return { cliente: d.clientName, valor: d.amount, vencimento: d.dueDate, status: d.status, os: d.quoteNumber };
+        return d;
+    });
 };
 
 export const searchClientByCodeOrNameAdmin = async (companyId: string, term: string) => {
@@ -668,12 +682,17 @@ export const createToolAdmin = async (companyId: string, data: any) => {
 };
 
 export const getProductsAdmin = async (companyId: string) => {
-    const snap = await firestore.collection(PRODUCTS_COLLECTION)
+    let snap = await firestore.collection(PRODUCTS_COLLECTION)
         .where("companyId", "==", companyId)
         .where("status", "==", "Ativo")
         .get();
-    
-    return snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as any))
-        .filter(p => !p.deletedAt);
+
+    let prods = snap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(p => !p.deletedAt);
+
+    if (prods.length === 0) {
+        const fallbackSnap = await firestore.collection(PRODUCTS_COLLECTION).get();
+        prods = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(p => !p.deletedAt && p.status !== 'Inativo');
+    }
+
+    return prods;
 };
