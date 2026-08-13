@@ -138,9 +138,11 @@ async function startBaileys() {
                 // Envia sinal de digitando ou gravando áudio
                 await sock.sendPresenceUpdate('composing', remoteJid);
 
-                // Memória de histórico da conversa por remetente
+                // Memória de histórico da conversa por remetente (limpa alucinações de erros antigos)
                 if (!global.waChatHistory) global.waChatHistory = new Map();
-                let userHistory = global.waChatHistory.get(remoteJid) || [];
+                let userHistory = (global.waChatHistory.get(remoteJid) || [])
+                    .filter((m) => !m.content || !m.content.includes('instabilidade na busca de produtos'));
+                
                 userHistory.push({ role: 'user', content: text });
                 if (userHistory.length > 10) userHistory = userHistory.slice(-10);
                 global.waChatHistory.set(remoteJid, userHistory);
