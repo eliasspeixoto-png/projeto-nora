@@ -1,0 +1,23 @@
+FROM node:20-slim
+
+# Instala dependências de sistema necessárias para ffmpeg (áudio/voz)
+RUN apt-get update && apt-get install -y ffmpeg python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copia arquivos de pacotes para instalação de dependências
+COPY package.json package-lock.json ./
+
+# Instala dependências de produção
+RUN npm ci --only=production || npm install --production
+
+# Copia os arquivos de script e voz do WhatsApp
+COPY scripts ./scripts
+
+# Porta exposta para Cloud Run / HTTP
+EXPOSE 8080
+
+ENV PORT=8080
+ENV NODE_ENV=production
+
+CMD ["node", "scripts/start-whatsapp.js"]

@@ -19,21 +19,22 @@ const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'nora_whatsapp_secret
 export async function getWhatsappQrCode(companyId: string): Promise<WhatsappStatus> {
     const instanceName = `NORA_${companyId.replace(/[^a-zA-Z0-9]/g, '')}`;
 
-    // Tenta primeiro o servidor nativo Baileys local (porta 8080)
+    // Tenta o servidor Baileys configurado (Cloud Run ou Local porta 8080)
+    const serverUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVER_URL || process.env.WHATSAPP_SERVER_URL || 'http://localhost:8080';
     try {
-        const localRes = await fetch('http://localhost:8080/qr', { cache: 'no-store' });
+        const localRes = await fetch(`${serverUrl.replace(/\/$/, '')}/qr`, { cache: 'no-store' });
         if (localRes.ok) {
             const localData = await localRes.json();
             return {
                 connected: localData.connected,
                 state: localData.state === 'open' ? 'open' : 'connecting',
                 qrCodeBase64: localData.qrCodeBase64,
-                instanceName: 'NORA_LOCAL_BAILEYS',
+                instanceName: 'NORA_CLOUD_BAILEYS',
                 phone: localData.phone
             };
         }
     } catch (e) {
-        // Se a porta 8080 não responder, faz o fallback para a URL externa
+        // Se o servidor Baileys não responder, faz o fallback
     }
     
     try {
@@ -145,6 +146,16 @@ export async function sendWhatsappMessage(instanceName: string, number: string, 
  */
 export async function logoutWhatsappInstance(instanceName: string) {
     try {
+        // Tenta primeiro no servidor local Baileys
+        try {
+            const localRes = await fetch('http://localhost:8080/logout', { method: 'DELETE' });
+            if (localRes.ok) {
+                return await localRes.json();
+            }
+        } catch (e) {
+            // Ignora se o local estiver indisponível
+        }
+
         const response = await fetch(`${EVOLUTION_API_URL}/instance/logout/${instanceName}`, {
             method: 'DELETE',
             headers: {

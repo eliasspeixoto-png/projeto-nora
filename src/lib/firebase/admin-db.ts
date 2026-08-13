@@ -189,6 +189,7 @@ export const getOnlineTeamAdmin = async (companyId: string) => {
         .map(data => ({
             nome: data.displayName,
             cargo: data.role,
+            fone: data.phone,
             ultima_atualizacao: data.lastLocationUpdated ? data.lastLocationUpdated : 'Recém logado'
         }));
 };
@@ -250,6 +251,36 @@ export const searchClientByCodeOrNameAdmin = async (companyId: string, term: str
         );
         
     return client || { error: 'Cliente não encontrado' };
+};
+
+export const searchTeamMemberAdmin = async (companyId: string, term: string) => {
+    const termNormalized = normalizeString(term);
+    
+    const snap = await firestore.collection(USERS_COLLECTION)
+        .where("companyId", "==", companyId)
+        .get();
+    
+    const user = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(d => !d.deletedAt && d.role !== 'cliente' && d.userType !== 'cliente')
+        .find(u => 
+            normalizeString(u.displayName || u.name || '').includes(termNormalized) || 
+            u.id === term ||
+            (u.email && normalizeString(u.email).includes(termNormalized))
+        );
+        
+    if (!user) return { error: `Funcionário(a) "${term}" não encontrado.` };
+    
+    // Retorna apenas dados relevantes
+    return {
+        id: user.id,
+        nome: user.displayName || user.name,
+        cargo: user.role,
+        email: user.email,
+        fone: user.phone,
+        status: user.isOnline ? 'Online' : 'Offline',
+        ultimaVezVisto: user.lastLocationUpdated || 'Desconhecido'
+    };
 };
 
 export const getPurchaseSummaryAdmin = async (companyId: string) => {

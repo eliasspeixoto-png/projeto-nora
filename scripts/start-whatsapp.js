@@ -445,8 +445,8 @@ async function startReminderPoller() {
 
                     await globalSock.sendMessage(targetJid, { text: data.messageText });
                     
-                    // Apaga da fila (delete) para manter a coleção limpa, ou marca como enviado
-                    await doc.ref.delete();
+                    // Marca como enviado em vez de deletar, para fins de log/auditoria
+                    await doc.ref.update({ status: 'sent', sentAt: new Date().toISOString() });
                 }
             }
         } catch (e) {

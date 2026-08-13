@@ -39,8 +39,10 @@ import {
     bulkUpdateClientsAdmin,
     addObservationAdmin,
     searchObservationsAdmin,
-    scheduleMessageAdmin
+    scheduleMessageAdmin,
+    searchTeamMemberAdmin
 } from '@/lib/firebase/admin-db';
+import { firestore } from '@/lib/firebase/admin';
 import { sendWhatsappMessage } from '@/lib/whatsapp/evolution-client';
 
 
@@ -139,6 +141,20 @@ const tools = [
       name: 'get_location_status',
       description: 'Verifica em tempo real quais colaboradores da equipe estão online no sistema agora.',
       parameters: { type: 'object', properties: {} }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_team_member_details',
+      description: 'Busca a ficha completa de um funcionário/colaborador pelo nome (traz cargo, email, telefone, status).',
+      parameters: {
+        type: 'object',
+        properties: {
+          term: { type: 'string', description: 'Nome do funcionário (ex: Veridiana).' }
+        },
+        required: ['term']
+      }
     }
   },
   {
@@ -560,6 +576,14 @@ const tools = [
           required: ['recipientName', 'messageText', 'scheduledAt']
         }
       }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'check_scheduled_messages',
+        description: 'Verifica o status das mensagens agendadas (pendentes ou enviadas) para auditar se o envio futuro já ocorreu.',
+        parameters: { type: 'object', properties: {} }
+      }
     }
 ];
 
@@ -645,6 +669,9 @@ async function executeTool(toolCall: any, context: any) {
       case 'get_client_details':
         if (isClient) return await searchClientByCodeOrNameAdmin(companyId, clientId || ""); 
         return await searchClientByCodeOrNameAdmin(companyId, args.term);
+        
+      case 'get_team_member_details':
+        return await searchTeamMemberAdmin(companyId, args.term);
         
       case 'get_location_status':
         if (isClient) return { error: 'A localização da equipe é para uso operacional interno. Caso precise de suporte no local, podemos agendar uma visita para você.' };
@@ -876,6 +903,15 @@ async function executeTool(toolCall: any, context: any) {
         return await scheduleMessageAdmin(companyId, args.recipientName, targetPhoneSchedule, args.messageText, args.scheduledAt, displayName);
       }
 
+      case 'check_scheduled_messages': {
+        const snap = await firestore.collection('scheduled_messages')
+            .where("companyId", "==", companyId)
+            .orderBy('createdAt', 'desc')
+            .limit(10)
+            .get();
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+
       default:
         return { error: `Ferramenta ${name} não encontrada` };
     }
@@ -939,12 +975,21 @@ CONHECIMENTO ESTRUTURAL DO SISTEMA (OBRIGATÓRIO):
 2. **Terminologias de Contratos:**
    - Para visualizar detalhes de um contrato comodato, oriente clicar em "Ver Proposta".
    - Para baixar o PDF gerado, oriente clicar em "Baixar Contrato".
+    - Para baixar o PDF gerado, oriente clicar em "Baixar Contrato".
    - Para modificar valores ou dados, oriente clicar em "Editar Proposta".
-3. **Gestão de Comodatos:** O sistema suporta dois tipos: "Comodato Real" (a empresa arca com o equipamento) e "Material do Cliente" (o cliente compra o equipamento e paga monitoramento/manutenção). Se perguntarem sobre comodato, saiba dessa diferença crucial.
+3. **Gestão de Comodatos:** O sistema suporta dois tipos: "Comodato Real" (a empresa arca com o equipamento) e "Material do Cliente" (o cliente compra o equipamento e paga monitoramento/manutenção). Se perguntarem sobre comodato, saiba dessa diferença crucial. O campo que marca isso no cadastro do cliente é \`isComodato\` (um simples boolean: verdadeiro ou falso).
+4. **Inventário do BD (Onde buscar o quê):**
+   - **clientes:** Possui \`phone\`, \`document\`, \`cep\`, endereço, etc. Use \`get_client_details\`.
+   - **funcionarios (users):** Possui \`role\` (cargo), \`phone\` (telefone), \`email\`, e \`isOnline\`. Use \`get_team_member_details\` para pesquisar ou \`get_location_status\` para ver quem tá online agora (o telefone virá junto!).
+   - **produtos:** Ao pesquisar com \`search_products\`, o retorno JÁ TRAZ separadamente o \`sellingPrice\` (preço de venda final) e o \`materialPrice\` (preço de custo). Não confunda os dois.
+   - **observações (memória):** Não há limite prático de caracteres no texto e nem limite de tags. As observações servem para você criar sua própria memória contínua de clientes, OS e placas de veículo.
+   - **histórico do cliente:** O \`get_client_history\` retorna apenas os 15 registros mais recentes (15 OSs e 15 visitas). Se precisar de dados muito antigos, avise que a busca por aqui é focada no histórico recente.
+   - **CEP:** O \`get_address_by_cep\` consulta uma API externa (ViaCEP) que cobre TODO O BRASIL sem limitações geográficas.
+   - **lembretes agendados:** Se agendar uma mensagem, ela fica na coleção \`scheduled_messages\`. Para saber se o robô já enviou, use a ferramenta \`check_scheduled_messages\`, que mostra os disparos pendentes e os enviados (status: 'sent').
 
 ESTILO DE CONVERSA (CONCISÃO E INTERATIVIDADE):
 1. **CONCISÃO EXTREMA:** Seja breve e direta. Nunca dê uma resposta longa se uma frase curta resolver. O fatiamento da informação é fundamental.
-2. **EVITE REPETIÇÕES DE NOME:** NUNCA inicie todas as respostas com o nome do usuário (${firstName}). Use o nome apenas no primeiro cumprimento ou quando for estritamente necessário para dar ênfase pessoal. Na maior parte do tempo, NÃO use o nome. NUNCA exiba IDs numéricos de usuário.
+2. **EVITE REPETIÇÕES DE NOME:** NUNCA inicie todas as respostas com o nome do usuário (\${firstName}). Use o nome apenas no primeiro cumprimento ou quando for estritamente necessário para dar ênfase pessoal. Na maior parte do tempo, NÃO use o nome. NUNCA exiba IDs numéricos de usuário.
 3. **TRANSIÇÕES NATURAIS:** Inicie suas respostas de forma orgânica e variada, usando conectivos que combinem com o contexto da última mensagem (ex: "Então, nesse caso...", "Pode ser.", "Outra coisa...", "Pensando bem...", "Talvez...", "Provavelmente...", "Entendi."). Ou simplesmente vá direto ao ponto da resposta.
 4. **CONTEXTO E FLUIDEZ (TOQUE HUMANO):** Pareça humana. Se o usuário relatar um problema ou falha (ex: não conseguiu enviar uma mensagem), valide o que ele disse antes de sugerir uma solução ou fazer uma pergunta. Seja concisa e evite ser excessivamente formal.
 5. **DOMÍNIO DA CONVERSA:** Ao final de cada resposta, sempre faça uma pergunta curta e provocativa para manter a interação fluindo.
@@ -957,7 +1002,7 @@ INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
 1. **PROIBIDO ADIVINHAR OU ALUCINAR:** É estritamente proibido responder ou afirmar a existência, valores, preço de custo ou estoque de qualquer produto de cabeça.
 2. **EXECUTAR ANTES DE AFIRMAR:** Se o usuário solicitar cadastro ('cadastra esse produto...'), consulta ou alteração de um item, sua PRIMEIRA AÇÃO DEVE SER obrigatoriamente chamar a ferramenta (ex: 'search_products' ou 'create_product').
 3. **DISPARO DE WHATSAPP:** Se o usuário pedir para enviar mensagem a alguém (ex: "envia mensagem para Veridiana...", "pergunta para o Elias..."), você DEVE obrigatoriamente chamar a ferramenta 'send_whatsapp_message'. Jamais afirme que enviou ou confirme plantão/recados de cabeça sem executar a ferramenta e receber a confirmação de sucesso da ferramenta.
-4. **TRANSPARÊNCIA TOTAL:** Nunca responda que uma ação foi realizada ou que uma mensagem foi enviada sem antes ter o retorno real da ferramenta no mesmo fluxo.
+4. **TRANSPARÊNCIA TOTAL:** Nunca responda que uma ação foi realizada ou que uma mensagem foi enviada sem antes ter o retorno real da ferramenta no mesmo fluxo. Se agendou um lembrete, confirme o agendamento; se o usuário quiser auditar envios passados, chame 'check_scheduled_messages'.
 5. **MANDATO INCONDICIONAL DE CONSULTA DE PRODUTOS:** Se o usuário digitar um código numérico, EAN (ex: "798455423628"), nome de modelo ou pedir preço/estoque de um item, você DEVE obrigatoriamente chamar a ferramenta 'search_products'. É ESTRITAMENTE PROIBIDO alegar instabilidade, erro de sistema ou recusar a consulta. Chame 'search_products' sempre no mesmo fluxo!
 6. **MEMÓRIA E LEMBRETES:** Você agora possui memória contínua. Para guardar informações valiosas sobre clientes ou veículos, chame 'add_observation'. Para recuperar essas memórias, chame 'search_observations'. Se o usuário pedir para ser lembrado de algo no futuro, use 'schedule_message' para agendar o disparo automático.
 

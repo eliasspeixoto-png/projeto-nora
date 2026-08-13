@@ -15,8 +15,8 @@ function convertMp3ToOpus(mp3Buffer) {
 
     try {
         fs.writeFileSync(inputPath, mp3Buffer);
-        // Aplica o filtro de áudio atempo=1.30 para a voz falar em ritmo mais rápido (1.30x)
-        execSync(`ffmpeg -y -i "${inputPath}" -af "atempo=1.30" -c:a libopus -b:a 32k -vbr on -ac 1 "${outputPath}"`, { stdio: 'ignore' });
+        // Converte diretamente para OPUS sem acelerar (a voz Neural já tem o ritmo perfeito)
+        execSync(`ffmpeg -y -i "${inputPath}" -c:a libopus -b:a 32k -vbr on -ac 1 "${outputPath}"`, { stdio: 'ignore' });
         
         if (fs.existsSync(outputPath)) {
             const opusBuffer = fs.readFileSync(outputPath);
@@ -54,10 +54,7 @@ function cleanTextForSpeech(text, firstName = 'Elias') {
 
     if (!clean) return '';
 
-    // Garante que o áudio comece citando primeiro o nome do usuário
-    if (firstName && !clean.toLowerCase().startsWith(firstName.toLowerCase())) {
-        clean = `${firstName}, ${clean}`;
-    }
+    // (A injeção forçada do nome foi removida para obedecer ao System Prompt)
 
     // Preserva o ponto de interrogação (?) para a sintetizadora fazer a entonação perfeita de pergunta!
     clean = clean
@@ -72,10 +69,12 @@ function cleanTextForSpeech(text, firstName = 'Elias') {
     return clean;
 }
 
+const { EdgeTTS } = require('node-edge-tts');
+
 /**
- * Gera um buffer de áudio nativo OGG/OPUS a partir de um texto em português brasileiro.
- * Suporta textos longos (respostas técnicas) fatiando em múltiplos trechos sintetizados.
+ * Gera um buffer de áudio nativo OGG/OPUS a partir de um texto usando Microsoft Edge TTS.
  * @param {string} text Texto a ser convertido em voz.
+ * @param {string} firstName Nome do usuário.
  * @returns {Promise<Buffer|null>} Buffer do áudio gerado.
  */
 async function textToSpeechBuffer(text, firstName = 'Elias') {
@@ -85,29 +84,25 @@ async function textToSpeechBuffer(text, firstName = 'Elias') {
     if (!cleanText) return null;
 
     try {
-        // Usa getAllAudioUrls para fatiar textos longos em trechos de ate 200 caracteres
-        const audioUrls = googleTTS.getAllAudioUrls(cleanText, {
+        const tts = new EdgeTTS({
+            voice: 'pt-BR-FranciscaNeural',
             lang: 'pt-BR',
-            slow: false,
-            host: 'https://translate.google.com',
-            timeout: 10000,
+            outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
         });
+        
+        const tmpDir = os.tmpdir();
+        const id = Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const tempMp3Path = path.join(tmpDir, `temp_edge_${id}.mp3`);
 
-        const mp3Buffers = [];
-        for (const item of audioUrls) {
-            const res = await fetch(item.url);
-            if (res.ok) {
-                const arrayBuffer = await res.arrayBuffer();
-                mp3Buffers.push(Buffer.from(arrayBuffer));
-            }
-        }
+        await tts.ttsPromise(cleanText, tempMp3Path);
 
-        if (mp3Buffers.length > 0) {
-            const combinedMp3 = Buffer.concat(mp3Buffers);
-            return convertMp3ToOpus(combinedMp3);
+        if (fs.existsSync(tempMp3Path)) {
+            const mp3Buffer = fs.readFileSync(tempMp3Path);
+            try { fs.unlinkSync(tempMp3Path); } catch (e) {}
+            return convertMp3ToOpus(mp3Buffer);
         }
     } catch (err) {
-        console.error("Erro ao gerar áudio TTS para texto longo:", err.message);
+        console.error("Erro ao gerar áudio TTS com Edge-TTS:", err.message);
     }
 
     return null;

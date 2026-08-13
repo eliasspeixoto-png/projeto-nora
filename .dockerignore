@@ -1,0 +1,12 @@
+.git
+.gitignore
+.next
+node_modules
+.whatsapp_auth
+docs
+public
+build_error.log
+typecheck_errors.txt
+*.log
+*.txt
+.env*
