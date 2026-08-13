@@ -29,7 +29,7 @@ export async function callDeepSeek(
       const errorData = await response.text();
       console.error('Erro DeepSeek API Status:', response.status, response.statusText);
       console.error('Erro DeepSeek API Data:', errorData);
-      throw new Error(`DeepSeek API error: ${response.status} - ${response.statusText}`);
+      throw new Error(`DeepSeek API error: ${response.status} - ${response.statusText} (${errorData})`);
     }
 
     const data = await response.json();

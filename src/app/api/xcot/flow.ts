@@ -32,6 +32,7 @@ import {
     updateRecordAdmin,
     deleteRecordAdmin,
     createProductAdmin,
+    getProductsAdmin,
     createSupplierAdmin,
     createVehicleAdmin,
     createToolAdmin,
