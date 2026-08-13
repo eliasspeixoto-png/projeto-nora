@@ -13,6 +13,7 @@ const fs = require('fs');
 let latestQrCodeBase64 = null;
 let connectionStatus = 'connecting';
 let connectedPhone = null;
+let globalSock = null;
 
 async function startBaileys() {
     const authPath = path.join(__dirname, '../.whatsapp_auth');
@@ -27,6 +28,7 @@ async function startBaileys() {
         printQRInTerminal: true,
         browser: ['NORA AI System', 'Chrome', '1.0.0']
     });
+    globalSock = sock;
 
     sock.ev.on('creds.update', saveCreds);
 
@@ -152,7 +154,7 @@ const server = http.createServer((req, res) => {
                     return res.end(JSON.stringify({ error: 'Parâmetros "number" e "text" são obrigatórios.' }));
                 }
 
-                if (!sock || connectionStatus !== 'open') {
+                if (!globalSock || connectionStatus !== 'open') {
                     res.writeHead(503);
                     return res.end(JSON.stringify({ error: 'WhatsApp não está conectado no momento.' }));
                 }
@@ -161,7 +163,7 @@ const server = http.createServer((req, res) => {
                 const formattedNumber = cleanNumber.startsWith('55') ? cleanNumber : `55${cleanNumber}`;
                 const jid = `${formattedNumber}@s.whatsapp.net`;
 
-                await sock.sendMessage(jid, { text });
+                await globalSock.sendMessage(jid, { text });
                 console.log(`🚀 [DISPARO DIRETO] Mensagem enviada para ${jid}: "${text}"`);
                 
                 res.writeHead(200);
