@@ -323,7 +323,7 @@ async function startBaileys() {
                     .filter((m) => !m.content || !m.content.includes('instabilidade na busca de produtos'));
                 
                 userHistory.push({ role: 'user', content: text });
-                if (userHistory.length > 10) userHistory = userHistory.slice(-10);
+                if (userHistory.length > 20) userHistory = userHistory.slice(-20);
                 global.waChatHistory.set(remoteJid, userHistory);
 
                 // Chama o endpoint da NORA (URL de Produção ou Local)
@@ -355,7 +355,7 @@ async function startBaileys() {
 
                 // Adiciona resposta da NORA ao histórico da conversa
                 userHistory.push({ role: 'assistant', content: responseText });
-                if (userHistory.length > 10) userHistory = userHistory.slice(-10);
+                if (userHistory.length > 20) userHistory = userHistory.slice(-20);
                 global.waChatHistory.set(remoteJid, userHistory);
 
                 // Formata o texto para WhatsApp
