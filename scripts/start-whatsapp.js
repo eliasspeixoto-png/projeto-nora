@@ -25,7 +25,7 @@ async function analyzeImageWithGemini(base64Image, mimeType = 'image/jpeg') {
     const payload = {
         contents: [{
             parts: [
-                { text: "Você é os olhos de um sistema de gestão. Descreva brevemente o que você vê nesta imagem. Se houver algum texto escrito, transcreva todo o texto com máxima precisão. Se for uma tela de sistema ou nota fiscal, descreva os campos e erros visíveis." },
+                { text: "Você é os olhos de um sistema de gestão. Descreva brevemente o que você vê nesta imagem. Se identificar que é uma Nota Fiscal, você DEVE extrair os dados dela em formato estruturado contendo: numero, serie, dataEmissao, fornecedor (nome e CNPJ), valorTotal e itens. Se identificar que é um Comprovante de Pagamento (PIX, TED, Boleto pago), você DEVE extrair: valorPago, pagadorNome, recebedorNome, dataPagamento, e idTransacao. Se houver outro tipo de texto escrito, transcreva todo o texto com máxima precisão. Descreva os campos e erros visíveis." },
                 {
                     inline_data: {
                         mime_type: mimeType,
@@ -76,7 +76,9 @@ async function analyzeImageWithGemini(base64Image, mimeType = 'image/jpeg') {
 
 // Inicializa o Firebase Admin
 if (!admin.apps.length) {
-    admin.initializeApp();
+    admin.initializeApp({
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'studio-2629657699-721b1.appspot.com'
+    });
 }
 const db = admin.firestore();
 const whatsappAuthCollection = db.collection('whatsapp_auth_v3');
@@ -245,13 +247,20 @@ async function startBaileys() {
                 const base64Image = imageBuffer.toString('base64');
                 const mimeType = imageMessage.mimetype || 'image/jpeg';
                 
+                console.log(`📸 [IMAGEM BAIXADA] Fazendo upload para o Storage...`);
+                const bucket = admin.storage().bucket();
+                const fileName = `whatsapp_media/${remoteJid}/${Date.now()}.jpg`;
+                const file = bucket.file(fileName);
+                await file.save(imageBuffer, { metadata: { contentType: mimeType } });
+                const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(fileName)}?alt=media`;
+                
                 console.log(`📸 [IMAGEM BAIXADA] Processando no Gemini Vision...`);
                 const geminiDescription = await analyzeImageWithGemini(base64Image, mimeType);
                 
                 if (geminiDescription) {
                     console.log(`👁️ [GEMINI VISION RESULTADO]:\n${geminiDescription}`);
                     const userCaption = text ? `\n\nLegenda do usuário: "${text}"` : '';
-                    text = `[IMAGEM RECEBIDA] O assistente visual descreveu a imagem enviada assim:\n"${geminiDescription}"${userCaption}`;
+                    text = `[IMAGEM RECEBIDA] Arquivo original: ${publicUrl}\nO assistente visual descreveu a imagem enviada assim:\n"${geminiDescription}"${userCaption}`;
                 } else {
                     console.warn("⚠️ Gemini não conseguiu descrever a imagem.");
                     if (!text) {
@@ -552,8 +561,123 @@ async function startReminderPoller() {
     }, 60000); // Checa a cada 60 segundos
 }
 
+async function startNoraCronPoller() {
+    // Roda a cada 30 minutos (1800000 ms)
+    setInterval(async () => {
+        if (!globalSock || connectionStatus !== 'open') return;
+        console.log('⏰ [NORA CRON] Iniciando varredura proativa...');
+
+        try {
+            // Data limite de segurança: 14/08/2026 (não atuar em nada antes disso)
+            const safetyDate = new Date('2026-08-14T00:00:00Z');
+            
+            // 48 horas atrás
+            const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+
+            // 1. Buscar empresas com autonomia operacional ativada
+            const companiesSnap = await db.collection('companies').get();
+            const activeCompanies = [];
+            
+            companiesSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.ai_autonomy && data.ai_autonomy.operational_active) {
+                    activeCompanies.push({ id: doc.id, name: data.name, autonomy: data.ai_autonomy });
+                }
+            });
+
+            if (activeCompanies.length === 0) return;
+
+            // 2. Para cada empresa, buscar orçamentos 'sent' que estão parados
+            for (const company of activeCompanies) {
+                const quotesSnap = await db.collection('quotes')
+                    .where('companyId', '==', company.id)
+                    .where('status', '==', 'sent')
+                    .get();
+
+                for (const doc of quotesSnap.docs) {
+                    const quote = doc.data();
+                    
+                    // Filtragem manual para evitar erros de índice ausente no Firestore
+                    const createdAt = new Date(quote.createdAt || quote.date);
+                    if (createdAt < safetyDate) continue; // Trava de Segurança Absoluta
+                    
+                    const updatedAt = new Date(quote.updatedAt || quote.createdAt || quote.date);
+                    if (updatedAt > fortyEightHoursAgo) continue; // Tem que estar parado há mais de 48h
+                    
+                    if (quote.lastFollowUp) continue; // Já foi cobrado
+                    if (!quote.clientPhone) continue; // Sem telefone não tem como cobrar
+
+                    console.log(`🤖 [NORA CRON] Processando Orçamento Frio: ${doc.id} (Cliente: ${quote.clientName})`);
+
+                    const itemsName = quote.items && Array.isArray(quote.items) ? quote.items.map(i => i.name).join(', ') : 'serviço';
+                    const prompt = `Você é a Inteligência Artificial da empresa ${company.name}. O orçamento de R$ ${quote.total || 0} para o cliente ${quote.clientName} está pendente de resposta há mais de 48 horas. Você está agindo proativamente agora. Escreva UMA MENSAGEM curta, muito natural e amigável para o WhatsApp do cliente, tentando retomar o assunto e oferecer ajuda para fechar o negócio. Não diga "eu acordei", aja naturalmente como uma vendedora humana acompanhando o cliente. Destaque no texto que o orçamento é referente a: ${itemsName}. Seja persuasiva.`;
+
+                    const targetApiUrl = process.env.NORA_API_URL 
+                        ? `${process.env.NORA_API_URL.replace(/\/$/, '')}/api/xcot` 
+                        : `http://localhost:${process.env.PORT || 3000}/api/xcot`;
+
+                    const fetchOptions = {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            messages: [{ role: 'user', content: prompt }],
+                            userContext: {
+                                uid: 'nora_cron',
+                                companyId: company.id,
+                                companyName: company.name,
+                                role: 'admin',
+                                displayName: 'NORA Cron',
+                                currentPath: '/cron'
+                            }
+                        })
+                    };
+
+                    try {
+                        const noraResponse = await fetch(targetApiUrl, fetchOptions);
+                        const parsed = await noraResponse.json();
+                        const responseText = parsed.response;
+
+                        if (responseText) {
+                            const cleanNumber = quote.clientPhone.replace(/\D/g, '');
+                            const formattedNumber = cleanNumber.startsWith('55') ? cleanNumber : `55${cleanNumber}`;
+                            let targetJid = `${formattedNumber}@s.whatsapp.net`;
+                            
+                            try {
+                                const results = await globalSock.onWhatsApp(formattedNumber);
+                                if (results && results.length > 0 && results[0].exists) {
+                                    targetJid = results[0].jid;
+                                } else if (formattedNumber.length === 13 && formattedNumber.startsWith('55')) {
+                                    const without9 = formattedNumber.slice(0, 4) + formattedNumber.slice(5);
+                                    const altResults = await globalSock.onWhatsApp(without9);
+                                    if (altResults && altResults.length > 0 && altResults[0].exists) {
+                                        targetJid = altResults[0].jid;
+                                    }
+                                }
+                            } catch(e) {}
+
+                            const cleanText = responseText.replace(/\[\[ azul: (.*?) \]\]/g, '*$1*').replace(/\*\*(.*?)\*\*/g, '*$1*');
+                            await globalSock.sendMessage(targetJid, { text: cleanText });
+                            console.log(`🤖 [NORA CRON] Mensagem de recuperação enviada para ${quote.clientName}`);
+
+                            await doc.ref.update({
+                                lastFollowUp: new Date().toISOString(),
+                                updatedAt: new Date().toISOString()
+                            });
+                        }
+                    } catch (fetchErr) {
+                        console.error('Erro ao acionar API da NORA no Cron:', fetchErr);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Erro no NORA Cron:', e);
+        }
+    }, 1800000); // 30 minutos
+}
+
 server.listen(8080, '0.0.0.0', () => {
     console.log('🚀 Servidor HTTP de QR Code e Envio de WhatsApp rodando em http://127.0.0.1:8080/qr');
     startBaileys();
     startReminderPoller();
+    startNoraCronPoller();
 });

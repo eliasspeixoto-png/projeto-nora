@@ -71,6 +71,12 @@ const companyFormSchema = z.object({
   defaultCommissionPercentage: z.coerce.number().min(0).optional(),
   defaultMonthlyGoal: z.coerce.number().min(0).optional(),
   logoFontColor: z.string().optional(),
+  ai_autonomy: z.object({
+    finance_active: z.boolean().default(false),
+    stock_active: z.boolean().default(false),
+    marketing_active: z.boolean().default(false),
+    operational_active: z.boolean().default(false),
+  }).optional(),
 });
 
 const distributorProfileSchema = z.object({
@@ -799,6 +805,7 @@ function SettingsPageContent() {
                         <TabsTrigger value="permissoes_individual" className="px-6 rounded-xl font-semibold uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-white">Membros</TabsTrigger>
                         <TabsTrigger value="manutencao" className="px-6 rounded-xl font-semibold uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-white">Sistema</TabsTrigger>
                         <TabsTrigger value="whatsapp" className="px-6 rounded-xl font-semibold uppercase text-[10px] tracking-widest data-[state=active]:bg-green-500 data-[state=active]:text-white">WhatsApp</TabsTrigger>
+                        <TabsTrigger value="ai_autonomy" className="px-6 rounded-xl font-semibold uppercase text-[10px] tracking-widest data-[state=active]:bg-blue-600 data-[state=active]:text-white"><div className="flex items-center gap-2"><Crown className="w-3 h-3"/> NORA Autonomia</div></TabsTrigger>
                     </TabsList>
                 </ScrollArea>
 
@@ -1219,6 +1226,85 @@ function SettingsPageContent() {
                   </TabsContent>
                   <TabsContent value="whatsapp" className="flex-1 mt-4 outline-none">
                       <WhatsappConnectionTab />
+                  </TabsContent>
+                  <TabsContent value="ai_autonomy" className="flex-1 mt-4 outline-none">
+                      <div className="h-full bg-background/40 backdrop-blur-3xl rounded-[2rem] border border-border/40 shadow-premium overflow-hidden">
+                          <Form {...form}>
+                              <form className="h-full flex flex-col" onSubmit={form.handleSubmit(onSubmit)}>
+                                  <header className="p-8 pb-4 space-y-1 flex items-center justify-between">
+                                      <div>
+                                          <h3 className="text-xl font-semibold uppercase tracking-tighter opacity-80 flex items-center gap-2">
+                                              <Crown className="h-5 w-5 text-blue-600" />
+                                              NORA: Autonomia e Super Poderes
+                                          </h3>
+                                          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground opacity-100">Ative ou desative as capacidades de decisão autônoma da IA.</p>
+                                      </div>
+                                      <Button type="submit" disabled={isSaving} className="h-12 px-8 rounded-xl font-bold uppercase tracking-widest text-[10px] bg-primary shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all">
+                                          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                          Salvar Autonomia
+                                      </Button>
+                                  </header>
+                                  <ScrollArea className="flex-1">
+                                      <div className="p-8 space-y-8">
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                              <FormField control={form.control} name="ai_autonomy.finance_active" render={({ field }) => (
+                                                  <FormItem className="flex flex-row items-center justify-between rounded-[2rem] border border-border/40 bg-background/20 p-8 shadow-sm">
+                                                      <div className="space-y-1.5">
+                                                          <FormLabel className="font-bold uppercase text-xs tracking-widest">Módulo Financeiro</FormLabel>
+                                                          <FormDescription className="text-[10px] font-semibold uppercase text-muted-foreground opacity-100 max-w-[250px]">
+                                                              Permite a NORA ler comprovantes de pagamento no WhatsApp e dar baixa automática em faturas.
+                                                          </FormDescription>
+                                                      </div>
+                                                      <FormControl>
+                                                          <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                                                      </FormControl>
+                                                  </FormItem>
+                                              )} />
+                                              <FormField control={form.control} name="ai_autonomy.stock_active" render={({ field }) => (
+                                                  <FormItem className="flex flex-row items-center justify-between rounded-[2rem] border border-border/40 bg-background/20 p-8 shadow-sm">
+                                                      <div className="space-y-1.5">
+                                                          <FormLabel className="font-bold uppercase text-xs tracking-widest">Estoque & Compras</FormLabel>
+                                                          <FormDescription className="text-[10px] font-semibold uppercase text-muted-foreground opacity-100 max-w-[250px]">
+                                                              Permite a NORA criar minutas de pedido de compra ao detectar estoque crítico.
+                                                          </FormDescription>
+                                                      </div>
+                                                      <FormControl>
+                                                          <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                                                      </FormControl>
+                                                  </FormItem>
+                                              )} />
+                                              <FormField control={form.control} name="ai_autonomy.marketing_active" render={({ field }) => (
+                                                  <FormItem className="flex flex-row items-center justify-between rounded-[2rem] border border-border/40 bg-background/20 p-8 shadow-sm">
+                                                      <div className="space-y-1.5">
+                                                          <FormLabel className="font-bold uppercase text-xs tracking-widest">Marketing & Leads</FormLabel>
+                                                          <FormDescription className="text-[10px] font-semibold uppercase text-muted-foreground opacity-100 max-w-[250px]">
+                                                              Permite a NORA capturar e qualificar clientes automaticamente pelo site.
+                                                          </FormDescription>
+                                                      </div>
+                                                      <FormControl>
+                                                          <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                                                      </FormControl>
+                                                  </FormItem>
+                                              )} />
+                                              <FormField control={form.control} name="ai_autonomy.operational_active" render={({ field }) => (
+                                                  <FormItem className="flex flex-row items-center justify-between rounded-[2rem] border border-border/40 bg-background/20 p-8 shadow-sm">
+                                                      <div className="space-y-1.5">
+                                                          <FormLabel className="font-bold uppercase text-xs tracking-widest">Módulo Operacional</FormLabel>
+                                                          <FormDescription className="text-[10px] font-semibold uppercase text-muted-foreground opacity-100 max-w-[250px]">
+                                                              Permite a NORA agendar visitas e cobrar tarefas da equipe de forma autônoma.
+                                                          </FormDescription>
+                                                      </div>
+                                                      <FormControl>
+                                                          <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                                                      </FormControl>
+                                                  </FormItem>
+                                              )} />
+                                          </div>
+                                      </div>
+                                  </ScrollArea>
+                              </form>
+                          </Form>
+                      </div>
                   </TabsContent>
             </Tabs>
         </div>

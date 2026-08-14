@@ -346,7 +346,7 @@ export default function AddEditProductDialog({ isOpen, setOpen, onProductSaved, 
 
   return (
     <Dialog open={isOpen} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-5xl sm:max-h-[92vh] flex flex-col p-0 bg-background/95 backdrop-blur-3xl border-border/40 shadow-premium sm:overflow-hidden sm:rounded-[2.5rem]">
+      <DialogContent className="max-h-[100dvh] overflow-hidden sm:max-w-5xl sm:max-h-[92vh] flex flex-col p-0 bg-background/95 backdrop-blur-3xl border-border/40 shadow-premium sm:rounded-[2.5rem]">
         <DialogHeader className="p-8 pb-6 border-b border-border/40 bg-muted/30">
           <div className="flex items-center gap-5">
             <div className="p-4 rounded-[1.2rem] bg-primary shadow-xl shadow-primary/20 text-white">
@@ -941,8 +941,8 @@ export default function AddEditProductDialog({ isOpen, setOpen, onProductSaved, 
             </Tabs>
           </form>
         </Form>
-        <DialogFooter className="p-8 pt-6 bg-muted/20 border-t border-border/40 backdrop-blur-md">
-          <Button type="button" variant="ghost" onClick={() => setOpen(false)} className="h-12 px-6 rounded-2xl font-bold uppercase tracking-widest text-[10px] bg-stone-100 dark:bg-stone-800/50 hover:bg-stone-200 dark:hover:bg-stone-800 transition-all border border-stone-200 dark:border-stone-700">
+        <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-2 p-8 pt-6 bg-muted/20 border-t border-border/40 backdrop-blur-md">
+          <Button type="button" variant="outline" onClick={() => setOpen(false)} className="h-12 px-6 rounded-2xl font-bold uppercase tracking-widest text-[10px] bg-background/50 border-border/40 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all shadow-sm">
             Cancelar Alterações
           </Button>
           <Button type="submit" form="product-form" disabled={isSubmitting} className="h-12 px-10 rounded-2xl font-bold uppercase tracking-widest text-[10px] bg-primary shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">
@@ -950,7 +950,7 @@ export default function AddEditProductDialog({ isOpen, setOpen, onProductSaved, 
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> Processando...
               </div>
-            ) : (isEditing ? "Atualizar Base" : "Confirmar Cadastro")}
+            ) : (isEditing ? "Salvar Alterações" : "Confirmar Cadastro")}
           </Button>
         </DialogFooter>
       </DialogContent>

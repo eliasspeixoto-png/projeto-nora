@@ -41,7 +41,11 @@ import {
     searchObservationsAdmin,
     scheduleMessageAdmin,
     searchTeamMemberAdmin,
-    createTeamMemberAdmin
+    createTeamMemberAdmin,
+    createNotaFiscalAdmin,
+    addFotoOSAdmin,
+    processPaymentReceiptAdmin,
+    getCompanyAiSettingsAdmin
 } from '@/lib/firebase/admin-db';
 import { firestore } from '@/lib/firebase/admin';
 import { sendWhatsappMessage } from '@/lib/whatsapp/evolution-client';
@@ -602,6 +606,61 @@ const tools = [
         description: 'Verifica o status das mensagens agendadas (pendentes ou enviadas) para auditar se o envio futuro já ocorreu.',
         parameters: { type: 'object', properties: {} }
       }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'cadastrar_nota_fiscal',
+        description: 'Cadastra uma nota fiscal extraída via OCR da imagem. Recebe todos os detalhes e cadastra no status "Pendente de Conferência".',
+        parameters: {
+          type: 'object',
+          properties: {
+            numero: { type: 'string', description: 'Número da nota' },
+            serie: { type: 'string' },
+            dataEmissao: { type: 'string' },
+            fornecedor: { type: 'string', description: 'Nome e CNPJ do fornecedor' },
+            valorTotal: { type: 'string' },
+            itens: { 
+              type: 'array', 
+              items: { type: 'object', properties: { descricao: { type: 'string' }, codigo: { type: 'string' }, quantidade: { type: 'string' }, valorUnitario: { type: 'string' }, valorTotal: { type: 'string' } } }
+            },
+            arquivoUrl: { type: 'string', description: 'URL da imagem/arquivo da nota recebido' }
+          },
+          required: ['fornecedor', 'valorTotal', 'arquivoUrl']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'anexar_foto_os',
+        description: 'Anexa uma foto a uma Ordem de Serviço ou orçamento existente.',
+        parameters: {
+          type: 'object',
+          properties: {
+            osId: { type: 'string', description: 'ID da O.S. ou Orçamento' },
+            url: { type: 'string', description: 'URL da foto' },
+            descricao: { type: 'string', description: 'Breve descrição da foto' }
+          },
+          required: ['osId', 'url']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'process_payment_receipt',
+        description: 'Recebe os dados extraídos de um comprovante de pagamento (PIX, TED, Boleto) enviado pelo cliente/usuário e dá baixa na fatura do Contas a Receber.',
+        parameters: {
+          type: 'object',
+          properties: {
+            value: { type: 'string', description: 'Valor pago (ex: 150.00)' },
+            payerName: { type: 'string', description: 'Nome de quem pagou' },
+            date: { type: 'string', description: 'Data do pagamento' }
+          },
+          required: ['value']
+        }
+      }
     }
 ];
 
@@ -931,6 +990,20 @@ async function executeTool(toolCall: any, context: any) {
             .limit(10)
             .get();
         return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+
+      case 'cadastrar_nota_fiscal':
+        return await createNotaFiscalAdmin(companyId, args);
+
+      case 'anexar_foto_os':
+        return await addFotoOSAdmin(companyId, args.osId, args.url, args.descricao || '', displayName);
+
+      case 'process_payment_receipt': {
+        const aiSettings = await getCompanyAiSettingsAdmin(companyId);
+        if (!aiSettings || !aiSettings.finance_active) {
+            return { error: `Módulo Financeiro Autônomo está desativado nas Configurações da Empresa. Informe ao usuário que você leu o comprovante de R$ ${args.value}, mas ele precisa dar a baixa manualmente ou ativar a Autonomia Financeira.` };
+        }
+        return await processPaymentReceiptAdmin(companyId, args);
       }
 
       default:

@@ -9,7 +9,7 @@ import {
   type Firestore 
 } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
-import { getMessaging, type Messaging } from "firebase/messaging";
+import { getMessaging, isSupported as isMessagingSupported, type Messaging } from "firebase/messaging";
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 
 const firebaseConfig = {
@@ -60,8 +60,10 @@ if (!isServer) {
             db = getFirestore(app);
         }
 
-        // Initialize Messaging
-        messaging = getMessaging(app);
+        // Initialize Messaging safely
+        isMessagingSupported().then(yes => {
+            if (yes) messaging = getMessaging(app);
+        }).catch(() => {});
 
         // Initialize Analytics safely
         isSupported().then(yes => {

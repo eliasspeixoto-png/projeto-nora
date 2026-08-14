@@ -807,3 +807,107 @@ export const scheduleMessageAdmin = async (companyId: string, recipientName: str
         return { error: 'Falha ao agendar mensagem: ' + e.message };
     }
 };
+
+export const createNotaFiscalAdmin = async (companyId: string, notaData: any) => {
+    try {
+        const docRef = await firestore.collection('notas_fiscais').add({
+            companyId,
+            ...notaData,
+            status: 'Pendente de Conferência',
+            dataImportacao: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+        });
+        return { success: true, id: docRef.id, message: `Nota fiscal registrada com sucesso (ID: ${docRef.id}). Status: Pendente de Conferência.` };
+    } catch (e: any) {
+        return { error: 'Falha ao registrar nota fiscal: ' + e.message };
+    }
+};
+
+export const addFotoOSAdmin = async (companyId: string, osId: string, url: string, descricao: string, enviadoPor: string) => {
+    try {
+        const osRef = firestore.collection(QUOTES_COLLECTION).doc(osId);
+        const doc = await osRef.get();
+        if (!doc.exists) {
+            return { error: `Ordem de Serviço (ou orçamento) ${osId} não encontrada.` };
+        }
+        
+        const osData = doc.data();
+        if (osData?.companyId !== companyId) {
+            return { error: 'Sem permissão para alterar esta O.S.' };
+        }
+
+        const admin = require('firebase-admin');
+        const novaFoto = {
+            id: firestore.collection('temp').doc().id,
+            url,
+            descricao: descricao || 'Foto anexada',
+            dataUpload: new Date().toISOString(),
+            enviadoPor: enviadoPor || 'NORA'
+        };
+
+        await osRef.update({
+            fotos: admin.firestore.FieldValue.arrayUnion(novaFoto),
+            updatedAt: new Date().toISOString()
+        });
+
+        return { success: true, message: `Foto anexada com sucesso à O.S. ${osId}.` };
+    } catch (e: any) {
+        return { error: 'Falha ao anexar foto: ' + e.message };
+    }
+};
+
+export const getCompanyAiSettingsAdmin = async (companyId: string) => {
+    try {
+        const doc = await firestore.collection(COMPANIES_COLLECTION).doc(companyId).get();
+        if (!doc.exists) return null;
+        const data = doc.data();
+        return data?.ai_autonomy || {
+            finance_active: false,
+            stock_active: false,
+            marketing_active: false,
+            operational_active: false
+        };
+    } catch (e) {
+        console.error("Error fetching AI settings:", e);
+        return null;
+    }
+};
+
+export const processPaymentReceiptAdmin = async (companyId: string, receiptData: any) => {
+    try {
+        // Find matching receivable based on value and approx date/payer
+        const { value, payerName, date } = receiptData;
+        const numValue = parseFloat(value.replace(',', '.'));
+        
+        const snap = await firestore.collection(ACCOUNTS_RECEIVABLE_COLLECTION)
+            .where("companyId", "==", companyId)
+            .where("status", "in", ["pending", "overdue"])
+            .get();
+            
+        let matchedDoc = null;
+        for (const doc of snap.docs) {
+            const data = doc.data();
+            // Basic matching logic: check if values match within a small margin
+            if (Math.abs(Number(data.value) - numValue) < 0.1) {
+                // To be safe, we could also check payer name if available, but for MVP we match value.
+                matchedDoc = { id: doc.id, ...data };
+                break;
+            }
+        }
+
+        if (!matchedDoc) {
+            return { error: `Não encontrei nenhuma conta a receber pendente no valor de R$ ${value}.` };
+        }
+
+        await firestore.collection(ACCOUNTS_RECEIVABLE_COLLECTION).doc(matchedDoc.id).update({
+            status: "paid",
+            paymentDate: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            receiptData: receiptData
+        });
+
+        return { success: true, message: `Baixa efetuada na conta (Ref: ${matchedDoc.description || matchedDoc.id}) no valor de R$ ${value}.` };
+    } catch (e: any) {
+        return { error: 'Falha ao processar comprovante: ' + e.message };
+    }
+};
