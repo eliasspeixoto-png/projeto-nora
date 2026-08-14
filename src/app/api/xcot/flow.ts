@@ -38,6 +38,7 @@ import {
     createToolAdmin,
     bulkUpdateClientsAdmin,
     addOSNoteAdmin,
+    settleReceivableAdmin,
     addObservationAdmin,
     searchObservationsAdmin,
     scheduleMessageAdmin,
@@ -558,6 +559,22 @@ const tools = [
     {
       type: 'function',
       function: {
+        name: 'settle_receivable',
+        description: 'Dá baixa / marca como Pago em uma ou mais contas a receber do financeiro pelo nome do cliente (ex: "Fabio Fontes"), pelo número da OS/Orçamento (ex: "ORC-0122/26") ou pelo ID da fatura.',
+        parameters: {
+          type: 'object',
+          properties: {
+            clientName: { type: 'string', description: 'Nome do cliente para dar baixa nas contas pendentes (ex: "Fabio Fontes").' },
+            quoteNumber: { type: 'string', description: 'Número do Orçamento ou OS vinculada (ex: "ORC-0122/26" ou "0141").' },
+            receivableId: { type: 'string', description: 'ID direto da fatura no Contas a Receber se souber.' },
+            paymentDate: { type: 'string', description: 'Data do pagamento (YYYY-MM-DD). Opcional.' }
+          }
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
         name: 'add_os_note',
         description: 'Registra uma Pendência, Defeito ou Observação diretamente dentro do documento da Ordem de Serviço (OS) ou Orçamento. Use SEMPRE esta ferramenta quando o usuário pedir para registrar ou adicionar uma pendência, defeito ou nota em uma OS.',
         parameters: {
@@ -1002,6 +1019,10 @@ async function executeTool(toolCall: any, context: any) {
         if (!args.updates || !Array.isArray(args.updates)) return { error: 'Lista de atualizações inválida.' };
         return await bulkUpdateClientsAdmin(companyId, args.updates);
 
+      case 'settle_receivable':
+        if (isClient) return { error: 'Apenas administradores podem dar baixa em títulos do contas a receber.' };
+        return await settleReceivableAdmin(companyId, args);
+
       case 'add_os_note':
         return await addOSNoteAdmin(companyId, args.osCode, args.type, args.text, displayName);
 
@@ -1165,6 +1186,7 @@ INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
 8. **VINCULAÇÃO E CONTEXTO DE OBSERVAÇÕES, PENDÊNCIAS E DEFEITOS:**
    - Ao chamar 'add_observation', você DEVE SEMPRE incluir nas tags todo o contexto da conversa: se estiver tratando de uma OS (ex: "OS-0145/26", "145"), de um cliente (ex: "FM Terraplenagem"), de veículos (ex: "BT 145", "BT 019") ou de categoria ("pendências", "defeito"), INCLUA TODAS ESSAS TAGS para permitir cruzamento automático.
    - Ao consultar pendências ou defeitos de uma OS ou cliente ('search_observations'), passe nas tags o código da OS ("OS-0145/26", "145"), o nome do cliente e a categoria ("pendências" ou "defeito") para encontrar imediatamente qualquer registro vinculado.
+9. **BAIXA NO CONTAS A RECEBER (FINANCEIRO):** Se o usuário pedir para marcar uma conta como paga, quitar ou dar baixa no financeiro (ex: "marca como pago as pendências do Fabio Fontes", "marca o ORC-0122/26 como pago"), você DEVE chamar IMEDIATAMENTE a ferramenta 'settle_receivable' informando o nome do cliente ou número da OS/Orçamento. NUNCA prometa fazer ou explique IDs para o usuário sem antes executar a ferramenta no mesmo fluxo!
 `;
 
   // Persona 1: CLIENTE (Concierge do Portal)

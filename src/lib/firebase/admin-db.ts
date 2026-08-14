@@ -227,7 +227,7 @@ export const getDetailedListAdmin = async (companyId: string, collectionName: st
         if (targetColl === PRODUCTS_COLLECTION) return { nome: d.description || d.name, codigo: d.item, estoque: d.stockQuantity };
         if (targetColl === QUOTES_COLLECTION) return { numero: d.quoteNumber, cliente: d.clientName, total: d.total, status: d.status, tecnico: d.assignedTechnicianName };
         if (targetColl === VISITS_COLLECTION) return { numero: d.visitNumber, cliente: d.clientName, status: d.status, data: d.visitDate, tecnico: d.technicianName };
-        if (targetColl === ACCOUNTS_RECEIVABLE_COLLECTION) return { cliente: d.clientName, valor: d.amount, vencimento: d.dueDate, status: d.status, os: d.quoteNumber };
+        if (targetColl === ACCOUNTS_RECEIVABLE_COLLECTION) return { id: d.id, cliente: d.clientName, valor: d.amount, vencimento: d.dueDate, status: d.status, os: d.quoteNumber };
         if (targetColl === USERS_COLLECTION) return { nome: d.displayName || d.name, cargo: d.role, email: d.email, fone: d.phone };
         return d;
     });
@@ -484,6 +484,7 @@ export const getClientHistoryAdmin = async (companyId: string, clientName: strin
         .map(d => ({ id: d.id, ...d.data() } as any))
         .filter(isMatch)
         .map(d => ({
+            id: d.id,
             descricao: d.description,
             valor: d.amount,
             vencimento: d.dueDate,
@@ -881,6 +882,66 @@ export const addOSNoteAdmin = async (companyId: string, osCodeOrId: string, type
         };
     } catch (e: any) {
         return { error: 'Falha ao registrar nota na OS: ' + e.message };
+    }
+};
+
+export const settleReceivableAdmin = async (companyId: string, options: { clientName?: string; quoteNumber?: string; receivableId?: string; paymentDate?: string }) => {
+    try {
+        const { clientName, quoteNumber, receivableId, paymentDate } = options;
+        const nowISO = paymentDate || getBrasiliaDate().toISOString();
+
+        let snap = await firestore.collection(ACCOUNTS_RECEIVABLE_COLLECTION).where("companyId", "==", companyId).get();
+        let docsToSettle = snap.docs.filter(d => !d.data().deletedAt && d.data().status !== 'Pago');
+
+        if (receivableId) {
+            docsToSettle = docsToSettle.filter(d => d.id === receivableId);
+        } else if (quoteNumber) {
+            const cleanQ = quoteNumber.trim().toUpperCase().replace('OS-', '').replace('ORC-', '');
+            docsToSettle = docsToSettle.filter(d => {
+                const q = (d.data().quoteNumber || '').toUpperCase();
+                return q.includes(cleanQ) || q === quoteNumber.trim().toUpperCase();
+            });
+        } else if (clientName) {
+            const termNorm = normalizeString(clientName);
+            docsToSettle = docsToSettle.filter(d => normalizeString(d.data().clientName || '').includes(termNorm));
+        } else {
+            return { error: 'Informe o nome do cliente, número da OS ou ID da conta a receber para dar baixa.' };
+        }
+
+        if (docsToSettle.length === 0) {
+            return { error: 'Nenhuma conta a receber pendente foi encontrada com os critérios informados.' };
+        }
+
+        const batch = firestore.batch();
+        const settledList: any[] = [];
+        let totalAmount = 0;
+
+        docsToSettle.forEach(doc => {
+            const data = doc.data();
+            batch.update(doc.ref, {
+                status: 'Pago',
+                paymentDate: nowISO
+            });
+            totalAmount += (data.amount || 0);
+            settledList.push({
+                id: doc.id,
+                cliente: data.clientName,
+                os: data.quoteNumber,
+                valor: data.amount,
+                vencimento: data.dueDate
+            });
+        });
+
+        await batch.commit();
+
+        return {
+            success: true,
+            message: `${settledList.length} conta(s) a receber marcada(s) como PAGA(S) com sucesso! Total baixado: ${totalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`,
+            contas_baixadas: settledList,
+            total_baixado: totalAmount
+        };
+    } catch (e: any) {
+        return { error: 'Falha ao dar baixa nas contas a receber: ' + e.message };
     }
 };
 

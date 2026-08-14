@@ -10,46 +10,21 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 async function run() {
-  const osDocRef = db.collection('quotes').doc('NFlwBCayBSdhnfkI8t2v');
-  const osSnap = await osDocRef.get();
-  
-  if (!osSnap.exists) {
-    console.error("OS document not found!");
-    return;
-  }
+  const companyId = 'Z6XlJobG4TfPoYMwLNC0';
+  const nowISO = new Date().toISOString();
 
-  const osNotes = [
-    {
-      id: "note_1786734000001",
-      type: "pendencia",
-      text: "Trocar fusível de 3 amper por fusível de 1 amper nos caminhões BT 05, BT 019, BT 048, BT 145, BT 307 e BT 315.",
-      author: "Elias Schuindt Peixoto",
-      createdAt: new Date().toISOString(),
-      status: "Pendente"
-    },
-    {
-      id: "note_1786734000002",
-      type: "defeito",
-      text: "BT 307 gerou erro de HD, reiniciado e a falha foi corrigida. BT 019 está com a câmera do lado carona parada.",
-      author: "Elias Schuindt Peixoto",
-      createdAt: new Date().toISOString(),
-      status: "Pendente"
-    },
-    {
-      id: "note_1786734000003",
-      type: "observacao",
-      text: "Durante a instalação identificamos suporte da bomba de óleo torado. Informado ao mecânico (BT 019).",
-      author: "Elias Schuindt Peixoto",
-      createdAt: new Date().toISOString(),
-      status: "Registrado"
-    }
-  ];
-
-  await osDocRef.update({
-    osNotes: osNotes
+  // 1. Marca como pago as faturas do Fabio Fontes
+  await db.collection('accountsReceivable').doc('AjqDfiSGjRJL9pPQOJwI').update({
+    status: 'Pago',
+    paymentDate: nowISO
   });
 
-  console.log("MIGRAÇÃO CONCLUÍDA: osNotes adicionado com sucesso ao documento da OS-0145/26!");
+  await db.collection('accountsReceivable').doc('sZ2kNkBjgRZfiMl58Dmk').update({
+    status: 'Pago',
+    paymentDate: nowISO
+  });
+
+  console.log("SUCESSO: As 2 contas a receber do Fabio Fontes foram marcadas como PAGAS no Firestore!");
 }
 
 run();
