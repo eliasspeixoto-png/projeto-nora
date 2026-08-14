@@ -36,21 +36,42 @@ async function analyzeImageWithGemini(base64Image, mimeType = 'image/jpeg') {
         }]
     };
 
-    try {
-        const response = await fetch(url, {
+    return new Promise((resolve) => {
+        const https = require('https');
+        const reqData = JSON.stringify(payload);
+        
+        const req = https.request(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(reqData)
+            }
+        }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const json = JSON.parse(data);
+                    if (json.candidates && json.candidates[0]?.content?.parts?.[0]?.text) {
+                        resolve(json.candidates[0].content.parts[0].text.trim());
+                    } else {
+                        resolve(null);
+                    }
+                } catch (e) {
+                    console.error("Erro ao parsear resposta do Gemini:", e);
+                    resolve(null);
+                }
+            });
         });
-        const data = await response.json();
-        if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-            return data.candidates[0].content.parts[0].text.trim();
-        }
-        return null;
-    } catch (err) {
-        console.error("Erro ao analisar imagem no Gemini:", err);
-        return null;
-    }
+
+        req.on('error', (e) => {
+            console.error("Erro de rede ao acessar Gemini:", e);
+            resolve(null);
+        });
+
+        req.write(reqData);
+        req.end();
+    });
 }
 
 // Inicializa o Firebase Admin
