@@ -824,6 +824,66 @@ export const getProductsAdmin = async (companyId: string) => {
         .filter(p => !p.deletedAt && p.status !== 'Inativo');
 };
 
+export const addOSNoteAdmin = async (companyId: string, osCodeOrId: string, type: 'pendencia' | 'defeito' | 'observacao', text: string, author: string) => {
+    try {
+        const term = (osCodeOrId || '').trim().toUpperCase();
+        const normalizedCode = term.replace('OS-', 'ORC-');
+        const numberMatch = term.match(/\d+/);
+        const numberPart = numberMatch ? numberMatch[0] : null;
+        const numberPartNoZeros = numberPart ? parseInt(numberPart, 10).toString() : null;
+
+        let snap = await firestore.collection(QUOTES_COLLECTION).where("companyId", "==", companyId).get();
+        let docMatch = snap.docs.find(d => {
+            const data = d.data();
+            if (d.id === osCodeOrId) return true;
+            if (!data.quoteNumber) return false;
+            const qNum = data.quoteNumber.toUpperCase();
+            return qNum === term || 
+                   qNum === normalizedCode || 
+                   qNum === term.replace('OS-', 'ORC-') || 
+                   qNum === term.replace('ORC-', 'OS-');
+        });
+
+        if (!docMatch && numberPartNoZeros) {
+            docMatch = snap.docs.find(d => {
+                const data = d.data();
+                if (!data.quoteNumber) return false;
+                return data.quoteNumber.includes(numberPart) ||
+                       data.quoteNumber.includes(`-${numberPartNoZeros}/`) ||
+                       data.quoteNumber.includes(`-${numberPartNoZeros.padStart(4, '0')}/`);
+            });
+        }
+
+        if (!docMatch) {
+            return { error: `Ordem de Serviço ${osCodeOrId} não encontrada no sistema.` };
+        }
+
+        const newNote = {
+            id: `note_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            type,
+            text,
+            author: author || 'NORA',
+            createdAt: new Date().toISOString(),
+            status: type === 'pendencia' || type === 'defeito' ? 'Pendente' : 'Registrado'
+        };
+
+        const docRef = docMatch.ref;
+        const existingNotes = docMatch.data().osNotes || [];
+        await docRef.update({
+            osNotes: [...existingNotes, newNote]
+        });
+
+        return { 
+            success: true, 
+            message: `${type === 'pendencia' ? 'Pendência' : (type === 'defeito' ? 'Defeito' : 'Observação')} registrada com sucesso diretamente na ${docMatch.data().quoteNumber}!`,
+            note: newNote,
+            osNumber: docMatch.data().quoteNumber
+        };
+    } catch (e: any) {
+        return { error: 'Falha ao registrar nota na OS: ' + e.message };
+    }
+};
+
 export const addObservationAdmin = async (companyId: string, tags: string[], text: string, author: string, scope: string = 'local') => {
     try {
         const targetCompanyId = scope === 'global' ? 'GLOBAL' : companyId;

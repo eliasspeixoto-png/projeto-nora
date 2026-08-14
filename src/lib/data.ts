@@ -270,6 +270,15 @@ export type StatusHistory = {
 };
 
 
+export type OSNote = {
+  id: string;
+  type: 'pendencia' | 'defeito' | 'observacao';
+  text: string;
+  author?: string;
+  createdAt: string;
+  status?: 'Pendente' | 'Resolvido' | 'Registrado';
+};
+
 export type Quote = {
   id: string;
   quoteNumber: string;
@@ -290,6 +299,7 @@ export type Quote = {
   installments?: number;
   interestRate?: number;
   notes?: string;
+  osNotes?: OSNote[];
   returnReason?: string;
   returnedBy?: string; // Nome do técnico que devolveu a O.S.
   returnedAt?: string; // Data/Hora da devolução (ISO)

@@ -37,6 +37,7 @@ import {
     createVehicleAdmin,
     createToolAdmin,
     bulkUpdateClientsAdmin,
+    addOSNoteAdmin,
     addObservationAdmin,
     searchObservationsAdmin,
     scheduleMessageAdmin,
@@ -557,6 +558,22 @@ const tools = [
     {
       type: 'function',
       function: {
+        name: 'add_os_note',
+        description: 'Registra uma Pendência, Defeito ou Observação diretamente dentro do documento da Ordem de Serviço (OS) ou Orçamento. Use SEMPRE esta ferramenta quando o usuário pedir para registrar ou adicionar uma pendência, defeito ou nota em uma OS.',
+        parameters: {
+          type: 'object',
+          properties: {
+            osCode: { type: 'string', description: 'Número ou código da OS (ex: "OS-0145/26", "145/26", "ORC-0145/26" ou ID da OS).' },
+            type: { type: 'string', enum: ['pendencia', 'defeito', 'observacao'], description: 'Tipo da nota: "pendencia" (tarefas/serviços a fazer), "defeito" (equipamentos ou peças com falha) ou "observacao" (nota geral).' },
+            text: { type: 'string', description: 'Descrição detalhada e clara da pendência, defeito ou observação.' }
+          },
+          required: ['osCode', 'type', 'text']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
         name: 'add_observation',
         description: 'Adiciona uma nota ou observação global vinculada a uma ou mais palavras-chave (tags), como o nome de um cliente, placa de veículo, número de OS, ou modelo de equipamento.',
         parameters: {
@@ -984,6 +1001,9 @@ async function executeTool(toolCall: any, context: any) {
         if (isClient) return { error: 'Apenas administradores podem realizar atualizações em massa.' };
         if (!args.updates || !Array.isArray(args.updates)) return { error: 'Lista de atualizações inválida.' };
         return await bulkUpdateClientsAdmin(companyId, args.updates);
+
+      case 'add_os_note':
+        return await addOSNoteAdmin(companyId, args.osCode, args.type, args.text, displayName);
 
       case 'add_observation':
           return await addObservationAdmin(companyId, args.tags, args.text, displayName, args.scope || 'local');
