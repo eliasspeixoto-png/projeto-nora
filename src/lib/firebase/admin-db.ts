@@ -817,31 +817,36 @@ export const addObservationAdmin = async (companyId: string, tags: string[], tex
 
 export const searchObservationsAdmin = async (companyId: string, tags: string[]) => {
     try {
-        let queryLocal: any = firestore.collection('observations')
-            .where('companyId', '==', companyId)
-            .where('status', '==', 'Ativo');
-            
-        let queryGlobal: any = firestore.collection('observations')
-            .where('companyId', '==', 'GLOBAL')
-            .where('status', '==', 'Ativo');
-        
-        if (tags && tags.length > 0) {
-            // Firestore array-contains-any can search up to 10 elements
-            const formattedTags = tags.map(t => t.toLowerCase().trim());
-            queryLocal = queryLocal.where('tags', 'array-contains-any', formattedTags);
-            queryGlobal = queryGlobal.where('tags', 'array-contains-any', formattedTags);
-        }
-        
         const [snapLocal, snapGlobal] = await Promise.all([
-            queryLocal.orderBy('createdAt', 'desc').limit(15).get(),
-            queryGlobal.orderBy('createdAt', 'desc').limit(15).get()
+            firestore.collection('observations').where('companyId', '==', companyId).get(),
+            firestore.collection('observations').where('companyId', '==', 'GLOBAL').get()
         ]);
         
-        const localDocs = snapLocal.docs.map((d: any) => ({ id: d.id, ...d.data(), source: 'local' }));
-        const globalDocs = snapGlobal.docs.map((d: any) => ({ id: d.id, ...d.data(), source: 'global' }));
+        const formattedTags = (tags || []).map(t => t.toLowerCase().trim()).filter(Boolean);
+        
+        const filterDoc = (d: any, source: string) => {
+            const data = d.data();
+            if (data.status && data.status !== 'Ativo') return null;
+            
+            const docTags: string[] = (data.tags || []).map((t: string) => t.toLowerCase().trim());
+            const textLower = (data.text || '').toLowerCase();
+            
+            if (formattedTags.length > 0) {
+                const matches = formattedTags.some(searchTag => 
+                    docTags.some(docTag => docTag.includes(searchTag) || searchTag.includes(docTag)) ||
+                    textLower.includes(searchTag)
+                );
+                if (!matches) return null;
+            }
+            
+            return { id: d.id, ...data, source };
+        };
+        
+        const localDocs = snapLocal.docs.map(d => filterDoc(d, 'local')).filter(Boolean);
+        const globalDocs = snapGlobal.docs.map(d => filterDoc(d, 'global')).filter(Boolean);
         
         const allDocs = [...globalDocs, ...localDocs]
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
             .slice(0, 20);
             
         return allDocs;
