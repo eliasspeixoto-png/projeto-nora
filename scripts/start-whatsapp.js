@@ -14,6 +14,45 @@ const { textToSpeechBuffer } = require('./tts');
 const admin = require('firebase-admin');
 const { useFirestoreAuthState } = require('./use-firestore-auth');
 
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyAAVXYbvbWE3gXZEgqb6HzVR1UcI7VBz08';
+
+/**
+ * Envia uma imagem em Base64 para o Gemini 1.5 Flash para extração de texto e contexto visual.
+ */
+async function analyzeImageWithGemini(base64Image, mimeType = 'image/jpeg') {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const payload = {
+        contents: [{
+            parts: [
+                { text: "Você é os olhos de um sistema de gestão. Descreva brevemente o que você vê nesta imagem. Se houver algum texto escrito, transcreva todo o texto com máxima precisão. Se for uma tela de sistema ou nota fiscal, descreva os campos e erros visíveis." },
+                {
+                    inline_data: {
+                        mime_type: mimeType,
+                        data: base64Image
+                    }
+                }
+            ]
+        }]
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+            return data.candidates[0].content.parts[0].text.trim();
+        }
+        return null;
+    } catch (err) {
+        console.error("Erro ao analisar imagem no Gemini:", err);
+        return null;
+    }
+}
+
 // Inicializa o Firebase Admin
 if (!admin.apps.length) {
     admin.initializeApp();
@@ -165,6 +204,43 @@ async function startBaileys() {
             } catch (audioErr) {
                 console.error("Erro ao baixar/transcrever áudio do WhatsApp:", audioErr);
                 return;
+            }
+        }
+
+        const imageMessage = 
+            msg.message.imageMessage || 
+            msg.message.ephemeralMessage?.message?.imageMessage ||
+            msg.message.viewOnceMessageV2?.message?.imageMessage ||
+            msg.message.viewOnceMessage?.message?.imageMessage ||
+            msg.message.documentWithCaptionMessage?.message?.documentMessage;
+
+        const isImage = imageMessage && (imageMessage.mimetype?.startsWith('image/') || msg.message.imageMessage);
+
+        // Se a mensagem recebida for uma IMAGEM
+        if (isImage) {
+            console.log(`\n📸 [IMAGEM RECEBIDA] Baixando imagem de ${remoteJid}...`);
+            try {
+                const imageBuffer = await downloadMediaMessage(msg, 'buffer', {});
+                const base64Image = imageBuffer.toString('base64');
+                const mimeType = imageMessage.mimetype || 'image/jpeg';
+                
+                console.log(`📸 [IMAGEM BAIXADA] Processando no Gemini Vision...`);
+                const geminiDescription = await analyzeImageWithGemini(base64Image, mimeType);
+                
+                if (geminiDescription) {
+                    console.log(`👁️ [GEMINI VISION RESULTADO]:\n${geminiDescription}`);
+                    const userCaption = text ? `\n\nLegenda do usuário: "${text}"` : '';
+                    text = `[IMAGEM RECEBIDA] O assistente visual descreveu a imagem enviada assim:\n"${geminiDescription}"${userCaption}`;
+                } else {
+                    console.warn("⚠️ Gemini não conseguiu descrever a imagem.");
+                    if (!text) {
+                        text = "[IMAGEM RECEBIDA] O assistente visual falhou em analisar a imagem, e o usuário não enviou legenda.";
+                    } else {
+                        text = `[IMAGEM RECEBIDA] (Falha no assistente visual). Legenda do usuário: "${text}"`;
+                    }
+                }
+            } catch (imgErr) {
+                console.error("Erro ao processar imagem recebida:", imgErr);
             }
         }
 
