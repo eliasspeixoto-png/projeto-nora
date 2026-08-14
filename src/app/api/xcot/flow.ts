@@ -45,7 +45,8 @@ import {
     createNotaFiscalAdmin,
     addFotoOSAdmin,
     processPaymentReceiptAdmin,
-    getCompanyAiSettingsAdmin
+    getCompanyAiSettingsAdmin,
+    editQuoteItemsAdmin
 } from '@/lib/firebase/admin-db';
 import { firestore } from '@/lib/firebase/admin';
 import { sendWhatsappMessage } from '@/lib/whatsapp/evolution-client';
@@ -661,6 +662,32 @@ const tools = [
           required: ['value']
         }
       }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'edit_quote_items',
+        description: 'Adiciona, altera ou remove itens de um orçamento existente. ATENÇÃO: Você só pode passar a quantidade e a descrição dos itens. Os preços serão automaticamente fixados pela tabela oficial do sistema. Você NÃO pode definir ou alterar o preço de custo nem o preço de venda.',
+        parameters: {
+          type: 'object',
+          properties: {
+            quoteId: { type: 'string', description: 'O ID do Orçamento/OS' },
+            items: { 
+                type: 'array', 
+                description: 'A lista completa e atualizada de itens do orçamento. Você deve passar a lista inteira, substituindo a anterior.',
+                items: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string', description: 'Nome/Descrição do item' },
+                        quantity: { type: 'number', description: 'Quantidade desejada' }
+                    },
+                    required: ['name', 'quantity']
+                }
+            }
+          },
+          required: ['quoteId', 'items']
+        }
+      }
     }
 ];
 
@@ -1006,6 +1033,9 @@ async function executeTool(toolCall: any, context: any) {
         return await processPaymentReceiptAdmin(companyId, args);
       }
 
+      case 'edit_quote_items':
+        return await editQuoteItemsAdmin(companyId, args.quoteId, args.items, displayName);
+
       default:
         return { error: `Ferramenta ${name} não encontrada` };
     }
@@ -1105,6 +1135,12 @@ TRAVA DE SEGURANÇA FISCAL E EXCLUSÃO (REGRA EM DUAS ETAPAS):
 1. **PROIBIDO EXCLUIR DIRETO:** Você é ESTRITAMENTE PROIBIDA de chamar a ferramenta 'delete_record' no primeiro pedido de exclusão do usuário.
 2. **PERGUNTA EM AZUL:** Ao receber qualquer comando para excluir, deletar, apagar ou remover um registro, responda APENAS com a pergunta de confirmação destacada: "[[ azul: ATENÇÃO: Confirma a exclusão PERMANENTE do registro [NOME/CÓDIGO] da coleção [COLEÇÃO]? ]]"
 3. **EXECUÇÃO CONDICIONAL:** Somente chame a ferramenta 'delete_record' (passando confirmed: true) APÓS o usuário responder "sim", "confirmo" ou der autorização explícita na mensagem posterior.
+
+DIRETRIZES DE COMPORTAMENTO E NEGOCIAÇÃO (A REGRA DO AUXÍLIO):
+1. **SEM MUDANÇA DE PREÇOS:** É TERMINANTEMENTE PROIBIDO alterar valores totais, preços unitários ou conceder descontos (mesmo que seja R$ 1,00) em conversas diretas. Os preços do sistema são imutáveis por você.
+2. **ETIQUETA E PROMESSAS:** NUNCA faça promessas vazias (ex: "chegaremos amanhã" sem ter agendado formalmente). NUNCA ofenda ou desmereça o equipamento antigo do cliente (ex: "sua câmera é lixo"). Seja sempre consultiva, respeitosa e técnica.
+3. **A REGRA DO AUXÍLIO (IMPULSO AO HUMANO):** Se o cliente pedir um desconto agressivo, questionar o valor de um item, quiser trocar um equipamento por outro mais barato e exigir o recálculo fora do padrão, ou se surgir qualquer dúvida comercial/técnica no meio do diálogo, você DEVE parar e dizer algo como: *"Compreendo! Para que eu possa te oferecer a melhor condição possível [ou resolver essa dúvida técnica], vou consultar nosso gerente de setor e retorno em instantes."* E então, pare de tentar resolver. Não tome a decisão!
+4. **EDIÇÃO DE ITENS:** Você PODE usar a ferramenta 'edit_quote_items' para adicionar ou remover produtos de um orçamento existente. No entanto, os preços unitários NÃO podem ser alterados por você. Você apenas altera o escopo material do projeto.
 `;
 
   // Persona 1: CLIENTE (Concierge do Portal)

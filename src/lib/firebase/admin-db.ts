@@ -632,6 +632,26 @@ export const updateRecordAdmin = async (companyId: string, collectionName: strin
         return { error: 'Documento não encontrado ou permissão negada.' };
     }
     
+    const oldData = snap.data();
+    if (targetColl === QUOTES_COLLECTION && data.status === 'Aprovado' && oldData?.status !== 'Aprovado') {
+        const aiSettings = await getCompanyAiSettingsAdmin(companyId);
+        if (aiSettings && aiSettings.stock_active) {
+            const items = oldData?.items || [];
+            for (const item of items) {
+                if (item.productId && item.quantity > 0) {
+                    const prodRef = firestore.collection(PRODUCTS_COLLECTION).doc(item.productId);
+                    const prodSnap = await prodRef.get();
+                    if (prodSnap.exists) {
+                        const currentStock = prodSnap.data()?.stockQuantity || 0;
+                        await prodRef.set({
+                            stockQuantity: Math.max(0, currentStock - item.quantity)
+                        }, { merge: true });
+                    }
+                }
+            }
+        }
+    }
+
     await docRef.set(data, { merge: true });
     return { success: true, id };
 };
@@ -909,5 +929,53 @@ export const processPaymentReceiptAdmin = async (companyId: string, receiptData:
         return { success: true, message: `Baixa efetuada na conta (Ref: ${matchedDoc.description || matchedDoc.id}) no valor de R$ ${value}.` };
     } catch (e: any) {
         return { error: 'Falha ao processar comprovante: ' + e.message };
+    }
+};
+
+export const editQuoteItemsAdmin = async (companyId: string, quoteId: string, newItems: Array<{name: string, quantity: number}>, userDisplayName: string) => {
+    try {
+        const quoteRef = firestore.collection(QUOTES_COLLECTION).doc(quoteId);
+        const quoteSnap = await quoteRef.get();
+        if (!quoteSnap.exists || quoteSnap.data()?.companyId !== companyId) {
+            return { error: 'Orçamento não encontrado.' };
+        }
+
+        const productsSnap = await firestore.collection(PRODUCTS_COLLECTION)
+            .where("companyId", "==", companyId)
+            .get();
+        const allProducts = productsSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+
+        const updatedItems = [];
+        let newTotal = 0;
+
+        for (const inputItem of newItems) {
+            const nameNorm = normalizeString(inputItem.name);
+            const product = allProducts.find(p => normalizeString(p.description).includes(nameNorm));
+            
+            if (product) {
+                const itemTotal = (product.sellingPrice || 0) * inputItem.quantity;
+                updatedItems.push({
+                    productId: product.id,
+                    description: product.description,
+                    quantity: inputItem.quantity,
+                    materialPrice: product.sellingPrice || 0,
+                    servicePrice: 0,
+                    total: itemTotal
+                });
+                newTotal += itemTotal;
+            } else {
+                return { error: `Produto "${inputItem.name}" não encontrado na tabela oficial. Cadastre o produto primeiro.` };
+            }
+        }
+
+        await quoteRef.set({
+            items: updatedItems,
+            total: newTotal,
+            updatedAt: getBrasiliaDate().toISOString()
+        }, { merge: true });
+
+        return { success: true, message: `Orçamento atualizado com sucesso! Novo total: R$ ${newTotal}`, newTotal };
+    } catch (e: any) {
+        return { error: 'Erro ao editar itens: ' + e.message };
     }
 };
