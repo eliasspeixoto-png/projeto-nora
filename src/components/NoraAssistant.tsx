@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/firebase/auth/use-user';
-import { X, Bot, Trash2, Loader2, Send, Volume2, VolumeX } from 'lucide-react';
+import { X, Bot, Trash2, Loader2, Send, Volume2, VolumeX, Mic, Paperclip } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { cn } from '@/lib/utils';
@@ -35,6 +35,181 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !userProfile) return;
+
+    setLoading(true);
+    
+    // Add temporary message
+    const userMsg: Message = { role: 'user', content: `[Enviando arquivo: ${file.name}...]`, timestamp: new Date() };
+    setMessages(prev => [...prev, userMsg]);
+
+    try {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = async () => {
+            const base64Data = reader.result as string;
+            
+            // Call our new Vision API
+            const response = await fetch('/api/media/vision', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    base64Image: base64Data,
+                    mimeType: file.type
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.text) {
+                // Update the temporary message with the vision result and send to NORA
+                const finalContent = `[IMAGEM RECEBIDA] Arquivo original: ${file.name}\n\n[TEXTO EXTRAÍDO DA IMAGEM PELO SISTEMA DE VISÃO]:\n${data.text}\n\n[FIM DO TEXTO DA IMAGEM] Analise este documento e me diga o que deseja fazer.`;
+                
+                // Replace the temporary message in local state
+                setMessages(prev => {
+                    const newMsgs = [...prev];
+                    newMsgs[newMsgs.length - 1].content = `[Arquivo processado: ${file.name}]`;
+                    return newMsgs;
+                });
+                
+                // Trigger normal handleSend with the extracted text (hidden from user view, but sent to AI)
+                handleSendInternal(finalContent);
+            } else {
+                toast({ title: 'Erro', description: 'Não foi possível ler a imagem.', variant: 'destructive' });
+                setLoading(false);
+            }
+        };
+    } catch (err) {
+        console.error("Erro no upload:", err);
+        setLoading(false);
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (isRecording) {
+        mediaRecorderRef.current?.stop();
+        setIsRecording(false);
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) audioChunksRef.current.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            stream.getTracks().forEach(track => track.stop());
+            
+            setLoading(true);
+            const userMsg: Message = { role: 'user', content: '[Processando áudio...]', timestamp: new Date() };
+            setMessages(prev => [...prev, userMsg]);
+
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'voice.webm');
+
+            try {
+                const response = await fetch('/api/media/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.text) {
+                    setMessages(prev => {
+                        const newMsgs = [...prev];
+                        newMsgs[newMsgs.length - 1].content = `🎙️ ${data.text}`;
+                        return newMsgs;
+                    });
+                    handleSendInternal(`[Áudio do usuário transcrito]: "${data.text}"`);
+                } else {
+                    toast({ title: 'Erro', description: 'Falha ao transcrever áudio.', variant: 'destructive' });
+                    setLoading(false);
+                }
+            } catch (err) {
+                console.error("Erro no áudio:", err);
+                setLoading(false);
+            }
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+    } catch (err) {
+        toast({ title: 'Permissão negada', description: 'Libere o microfone no navegador.', variant: 'destructive' });
+    }
+  };
+
+  // Separated the backend call so we can call it transparently from media uploads
+  const handleSendInternal = async (contentToSend: string) => {
+    try {
+      const response = await fetch('/api/xcot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            // append this message to the history explicitly
+            messages: [...messages, { role: 'user', content: contentToSend }].map(({ role, content }) => ({ role, content })),
+            userContext: {
+                uid: userProfile?.uid || '',
+                companyId: userProfile?.companyId || '',
+                companyName: company?.name || 'empresa',
+                role: userProfile?.role || 'cliente',
+                displayName: userProfile?.displayName || 'Usuário',
+                clientId: userProfile?.clientId || '',
+                currentPath: pathname
+            }
+        }),
+      });
+
+      const data = await response.json();
+      
+      // ... process actions
+      if (data.actions && Array.isArray(data.actions)) {
+          data.actions.forEach((action: any, index: number) => {
+              const delay = index * 600;
+              setTimeout(() => {
+                  const isFenceAction = action.type.includes('fence');
+                  const targetPath = '/orcamentos/cerca-eletrica';
+                  if (isFenceAction) {
+                      const cleanCurrentPath = window.location.pathname.replace(/\/$/, "");
+                      const cleanTargetPath = targetPath.replace(/\/$/, "");
+                      if (cleanCurrentPath !== cleanTargetPath) {
+                          router.push(`${targetPath}?noraTrigger=${action.type}&noraData=${encodeURIComponent(JSON.stringify(action.data || {}))}`);
+                          return; 
+                      }
+                  }
+                  window.dispatchEvent(new CustomEvent('nora-action', { detail: action }));
+                  if (action.type === 'fill_fence_form') window.dispatchEvent(new CustomEvent('nora-fill-fence-form', { detail: action.data }));
+                  if (action.type === 'save_fence_quote') window.dispatchEvent(new CustomEvent('nora-save-fence-quote'));
+              }, delay);
+          });
+      }
+
+      const assistantMsg: Message = {
+        role: 'assistant',
+        content: data.response || data.error || "Erro ao processar.",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, assistantMsg]);
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `Ops, erro na conexão.`, timestamp: new Date() }]);
+    } finally {
+      setLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  };
 
 
   const getInitialMessage = useCallback((): Message => {
@@ -62,83 +237,7 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
-    try {
-      const response = await fetch('/api/xcot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            messages: [...messages, userMsg].map(({ role, content }) => ({ role, content })),
-            userContext: {
-                uid: userProfile.uid,
-                companyId: userProfile.companyId || '',
-                companyName: company?.name || 'empresa',
-                role: userProfile.role,
-                displayName: userProfile.displayName,
-                clientId: userProfile.clientId,
-                currentPath: pathname
-            }
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (data.actions && Array.isArray(data.actions)) {
-          console.log('[NORA] Actions received:', data.actions);
-          
-          // Processar cada ação sequencialmente
-          data.actions.forEach((action: any, index: number) => {
-              const delay = index * 600; // 600ms entre cada ação
-              
-              setTimeout(() => {
-                  console.log(`[NORA] Processing action (${index}):`, action);
-                  
-                  // Verificar se precisamos navegar para a página correta antes de disparar eventos de 'fence'
-                  const isFenceAction = action.type.includes('fence');
-                  const targetPath = '/orcamentos/cerca-eletrica';
-                  
-                  if (isFenceAction) {
-                      const cleanCurrentPath = window.location.pathname.replace(/\/$/, "");
-                      const cleanTargetPath = targetPath.replace(/\/$/, "");
-                      
-                      if (cleanCurrentPath !== cleanTargetPath) {
-                          console.log('[NORA] Navigating to fence page...');
-                          const navUrl = `${targetPath}?noraTrigger=${action.type}&noraData=${encodeURIComponent(JSON.stringify(action.data || {}))}`;
-                          router.push(navUrl);
-                          return; 
-                      }
-                  }
-
-                  // Disparar evento genérico
-                  window.dispatchEvent(new CustomEvent('nora-action', { detail: action }));
-                  
-                  // Disparar eventos específicos
-                  if (action.type === 'fill_fence_form') {
-                      window.dispatchEvent(new CustomEvent('nora-fill-fence-form', { detail: action.data }));
-                  }
-                  if (action.type === 'save_fence_quote') {
-                      console.log('[NORA] Triggering save via NORA action');
-                      window.dispatchEvent(new CustomEvent('nora-save-fence-quote'));
-                  }
-              }, delay);
-          });
-      }
-
-      const assistantMsg: Message = {
-        role: 'assistant',
-        content: data.response || data.error || "Lamento, ocorreu um erro ao processar sua solicitação. Por favor, tente novamente.",
-        timestamp: new Date(),
-      };
-      
-      setMessages(prev => [...prev, assistantMsg]);
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Ops, conexão instável. Tenta de novo? 😊`, timestamp: new Date() }]);
-    } finally {
-      setLoading(false);
-      // Dar foco novamente após enviar
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
-    }
+    await handleSendInternal(text);
   }, [loading, userProfile, company, messages, router, pathname]);
 
 
@@ -231,6 +330,23 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
 
       <div className="p-4 border-t bg-background shrink-0 pb-6">
         <div className="flex gap-2 items-end">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept="image/*,application/pdf"
+            onChange={handleFileUpload} 
+          />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="shrink-0 h-10 w-10 mb-[1px] text-muted-foreground"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading || isRecording}
+          >
+            <Paperclip className="h-5 w-5" />
+          </Button>
+
           <Input 
             ref={inputRef as any}
             value={input} 
@@ -238,18 +354,33 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
             onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { 
                 if (e.key === 'Enter') { 
                     e.preventDefault();
-                    // Usar o valor atual do elemento para garantir que pegamos a correção síncrona
                     handleSend(e.currentTarget.value); 
                 } 
             }} 
             suggestions={productSuggestions}
-            placeholder="Digite sua dúvida..." 
-            className="flex-1 h-10 border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all" 
-            disabled={loading} 
+            placeholder={isRecording ? "Gravando áudio..." : "Digite sua dúvida..."} 
+            className={cn(
+                "flex-1 h-10 border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all",
+                isRecording && "bg-red-50 text-red-600 placeholder:text-red-500 animate-pulse border-red-200"
+            )} 
+            disabled={loading || isRecording} 
           />
-          <Button onClick={() => handleSend(input)} disabled={loading || !input.trim()} size="icon" className="shrink-0 h-10 w-10 mb-[1px]">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
+
+          {!input.trim() ? (
+            <Button 
+              variant={isRecording ? "destructive" : "ghost"} 
+              size="icon" 
+              className={cn("shrink-0 h-10 w-10 mb-[1px]", isRecording ? "animate-pulse" : "text-muted-foreground")}
+              onClick={toggleRecording}
+              disabled={loading}
+            >
+              <Mic className="h-5 w-5" />
+            </Button>
+          ) : (
+            <Button onClick={() => handleSend(input)} disabled={loading} size="icon" className="shrink-0 h-10 w-10 mb-[1px]">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          )}
         </div>
       </div>
     </div>
