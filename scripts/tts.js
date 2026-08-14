@@ -5,7 +5,8 @@ const path = require('path');
 const os = require('os');
 
 /**
- * Converte um Buffer MP3 para OGG/OPUS nativo do WhatsApp Voice Note com aceleração de ritmo (1.22x).
+ * Converte um Buffer MP3 para OGG/OPUS nativo do WhatsApp Voice Note.
+ * A velocidade da voz é reduzida em 15% diretamente na configuração do EdgeTTS.
  */
 function convertMp3ToOpus(mp3Buffer) {
     const tmpDir = os.tmpdir();
@@ -87,7 +88,8 @@ async function textToSpeechBuffer(text, firstName = 'Elias') {
         const tts = new EdgeTTS({
             voice: 'pt-BR-FranciscaNeural',
             lang: 'pt-BR',
-            outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
+            outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
+            rate: '-15%'
         });
         
         const tmpDir = os.tmpdir();
