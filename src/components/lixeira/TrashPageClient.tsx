@@ -350,8 +350,8 @@ export default function TrashPageClient() {
             </div>
 
             <AlertDialog open={isDeleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
-                <AlertDialogContent className="w-[95vw] max-w-xl bg-background/60 backdrop-blur-3xl border-border/40 shadow-premium rounded-xl p-12 overflow-hidden relative">
-                    <div className="absolute top-0 right-0 p-8 opacity-5 text-destructive">
+                <AlertDialogContent className="w-[95vw] max-w-xl bg-background/60 backdrop-blur-3xl border-border/40 shadow-premium rounded-xl p-12 overflow-hidden">
+                    <div className="absolute top-0 right-0 p-8 opacity-5 text-destructive pointer-events-none">
                         <AlertTriangle className="h-32 w-32 rotate-12" />
                     </div>
                     <AlertDialogHeader className="space-y-6 relative z-10">
