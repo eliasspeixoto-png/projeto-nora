@@ -14,7 +14,7 @@ const { textToSpeechBuffer } = require('./tts');
 const admin = require('firebase-admin');
 const { useFirestoreAuthState } = require('./use-firestore-auth');
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AQ.Ab8RN6KPNlZlSMqfTnDFoUHKi6jd4a_SG20hNif8Ia6bdKIPgA';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || '';
 
 /**
  * Envia uma imagem em Base64 para o Gemini 2.5 Flash para extração de texto e contexto visual.
