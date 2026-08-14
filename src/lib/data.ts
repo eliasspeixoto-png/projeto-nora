@@ -159,6 +159,28 @@ export type Client = {
   longitude?: number;
 };
 
+
+
+export type NotaFiscal = {
+  id: string;
+  companyId: string;
+  numero: string;
+  serie?: string;
+  dataEmissao?: string;
+  fornecedor?: {
+    nome: string;
+    cnpj?: string;
+  } | string;
+  valorTotal?: string;
+  itens?: any[];
+  arquivoUrl?: string;
+  status?: string;
+  dataImportacao?: string;
+  createdAt?: string;
+};
+
+export type NotaFiscalData = Omit<NotaFiscal, "id">;
+
 export type Supplier = {
   id: string;
   name: string;

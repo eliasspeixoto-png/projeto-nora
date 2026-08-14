@@ -1,4 +1,3 @@
-
 import {
   collection,
   onSnapshot,
@@ -1485,4 +1484,14 @@ export const updateLead = async (db: Firestore, id: string, data: Partial<Lead>)
 
 export const deleteLead = async (db: Firestore, id: string) => {
     await setDoc(doc(db, LEADS_COLLECTION, id), { deletedAt: getBrasiliaDate().toISOString() }, { merge: true });
+};
+
+export const getNotasFiscaisOnce = async (db: Firestore, companyId: string) => {
+    const q = query(
+        collection(db, 'notas_fiscais'),
+        where("companyId", "==", companyId)
+        // Note: orderBy might require a composite index if used with where
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };

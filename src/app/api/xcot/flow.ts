@@ -717,8 +717,11 @@ async function executeTool(toolCall: any, context: any) {
             targetPhone = matchedUser.fone.replace(/\D/g, '');
           } else {
             const clientMatch: any = await searchClientByCodeOrNameAdmin(companyId, args.recipientName);
-            if (clientMatch && clientMatch.phone) {
-              targetPhone = clientMatch.phone.replace(/\D/g, '');
+            if (clientMatch) {
+              const phoneStr = clientMatch.whatsapp || clientMatch.phone || '';
+              if (phoneStr) {
+                targetPhone = phoneStr.replace(/\D/g, '');
+              }
             }
           }
         }

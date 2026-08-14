@@ -55,10 +55,11 @@ async function analyzeImageWithGemini(base64Image, mimeType = 'image/jpeg') {
                     if (json.candidates && json.candidates[0]?.content?.parts?.[0]?.text) {
                         resolve(json.candidates[0].content.parts[0].text.trim());
                     } else {
+                        console.error("⚠️ [GEMINI ERROR] Resposta inesperada ou erro:", JSON.stringify(json, null, 2));
                         resolve(null);
                     }
                 } catch (e) {
-                    console.error("Erro ao parsear resposta do Gemini:", e);
+                    console.error("Gemini parse erro:", e, "Raw data:", data);
                     resolve(null);
                 }
             });

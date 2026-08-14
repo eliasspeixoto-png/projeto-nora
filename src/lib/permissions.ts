@@ -52,6 +52,7 @@ export const allMenuItems: MenuItem[] = [
   { href: "/ferramentas", label: "Ferramentas", icon: Wrench, page: "ferramentas", color: "hsl(var(--menu-estoque))" },
   { href: "/financeiro", label: "Financeiro", icon: Banknote, page: "financeiro", color: "hsl(var(--menu-estoque))" },
   { href: "/fiscal", label: "Nota Fiscal de Serviço", icon: FileText, page: "fiscal", color: "hsl(var(--menu-estoque))" },
+  { href: "/notas-fiscais", label: "Notas de Entrada", icon: FileText, page: "notas-fiscais", color: "hsl(var(--menu-estoque))" },
   { href: "/funcionarios", label: "Funcionários", icon: Users2, page: "funcionarios", color: "hsl(var(--menu-estoque))" },
   { href: "/lixeira", label: "Lixeira", icon: Trash2, page: "lixeira", color: "hsl(var(--destructive))" },
   { href: "/marketing", label: "Marketing", icon: Megaphone, page: "marketing", color: "hsl(var(--menu-estoque))" },

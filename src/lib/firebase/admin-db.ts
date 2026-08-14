@@ -335,7 +335,9 @@ export const searchVisitByCodeAdmin = async (companyId: string, code: string, te
 export const searchQuoteByCodeAdmin = async (companyId: string, code: string, technicianId?: string, clientId?: string) => {
     const term = code.trim().toUpperCase();
     const normalizedCode = term.replace('OS-', 'ORC-');
-    const numberPart = term.match(/\d+/)?.[0];
+    const numberMatch = term.match(/\d+/);
+    const numberPart = numberMatch ? numberMatch[0] : null;
+    const numberPartNoZeros = numberPart ? parseInt(numberPart, 10).toString() : null;
     
     let query = firestore.collection(QUOTES_COLLECTION).where("companyId", "==", companyId);
     if (technicianId) query = query.where("assignedTechnicianId", "==", technicianId);
@@ -352,9 +354,14 @@ export const searchQuoteByCodeAdmin = async (companyId: string, code: string, te
         d.quoteNumber === term.replace('ORC-', 'OS-')
     );
     
-    // Se não achou, tenta por número parcial (extraindo apenas os dígitos)
-    if (!quote && numberPart) {
-        quote = docs.find(d => d.quoteNumber.includes(numberPart));
+    // Se não achou, tenta por número parcial tolerando zeros à esquerda
+    if (!quote && numberPartNoZeros) {
+        quote = docs.find(d => {
+            if (!d.quoteNumber) return false;
+            return d.quoteNumber.includes(numberPart) || 
+                   d.quoteNumber.includes(`-${numberPartNoZeros}/`) ||
+                   d.quoteNumber.includes(`-${numberPartNoZeros.padStart(4, '0')}/`);
+        });
     }
     
     if (!quote) return { error: `Registro ${code} não encontrado` };
@@ -944,7 +951,7 @@ export const processPaymentReceiptAdmin = async (companyId: string, receiptData:
             receiptData: receiptData
         });
 
-        return { success: true, message: `Baixa efetuada na conta (Ref: ${matchedDoc.description || matchedDoc.id}) no valor de R$ ${value}.` };
+        return { success: true, message: `Baixa efetuada na conta (Ref: ${(matchedDoc as any).description || matchedDoc.id}) no valor de R$ ${value}.` };
     } catch (e: any) {
         return { error: 'Falha ao processar comprovante: ' + e.message };
     }
