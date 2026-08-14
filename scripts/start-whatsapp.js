@@ -235,13 +235,14 @@ async function startBaileys() {
             msg.message.ephemeralMessage?.message?.imageMessage ||
             msg.message.viewOnceMessageV2?.message?.imageMessage ||
             msg.message.viewOnceMessage?.message?.imageMessage ||
-            msg.message.documentWithCaptionMessage?.message?.documentMessage;
+            msg.message.documentWithCaptionMessage?.message?.documentMessage ||
+            msg.message.documentMessage;
 
-        const isImage = imageMessage && (imageMessage.mimetype?.startsWith('image/') || msg.message.imageMessage);
+        const isMedia = imageMessage && (imageMessage.mimetype?.startsWith('image/') || imageMessage.mimetype === 'application/pdf' || msg.message.imageMessage);
 
-        // Se a mensagem recebida for uma IMAGEM
-        if (isImage) {
-            console.log(`\n📸 [IMAGEM RECEBIDA] Baixando imagem de ${remoteJid}...`);
+        // Se a mensagem recebida for uma IMAGEM ou PDF (Documento)
+        if (isMedia) {
+            console.log(`\n📸 [MÍDIA RECEBIDA] Baixando mídia (Imagem/PDF) de ${remoteJid}...`);
             try {
                 const imageBuffer = await downloadMediaMessage(msg, 'buffer', {});
                 const base64Image = imageBuffer.toString('base64');
