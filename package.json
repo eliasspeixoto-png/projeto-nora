@@ -4,7 +4,7 @@
   "description": "NORA App",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbo",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "whatsapp": "node scripts/start-whatsapp.js",

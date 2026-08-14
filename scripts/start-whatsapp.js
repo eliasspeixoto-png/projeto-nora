@@ -120,10 +120,31 @@ async function lookupUserOrClient(remoteJid) {
     if (snap.empty) snap = await db.collection('users').where('whatsapp', 'in', phones).limit(1).get();
     if (!snap.empty) {
         const u = snap.docs[0].data();
+        
+        // Verifica se a empresa desabilitou o WhatsApp para o cargo dele na matriz de grupos
+        let roleAllowed = true;
+        if (u.companyId && u.role && u.role !== 'admin' && u.role !== 'developer') {
+            try {
+                const compSnap = await db.collection('companies').doc(u.companyId).get();
+                if (compSnap.exists) {
+                    const compData = compSnap.data();
+                    if (compData.permissions && compData.permissions[u.role] && compData.permissions[u.role].whatsapp) {
+                        roleAllowed = compData.permissions[u.role].whatsapp.view !== false;
+                    }
+                }
+            } catch (err) {
+                console.error("Erro ao verificar permissão do cargo:", err);
+            }
+        }
+
+        const isExplicitlyAllowed = u.allowWhatsappAccess !== false && (u.permissions?.whatsapp?.view !== false) && roleAllowed;
+
         return {
+            id: snap.docs[0].id,
             companyId: u.companyId,
             role: u.role || 'user',
-            displayName: u.displayName || u.name || 'Funcionário'
+            displayName: u.displayName || u.name || 'Funcionário',
+            allowWhatsappAccess: isExplicitlyAllowed
         };
     }
 
@@ -133,9 +154,11 @@ async function lookupUserOrClient(remoteJid) {
     if (!clientSnap.empty) {
         const c = clientSnap.docs[0].data();
         return {
+            id: clientSnap.docs[0].id,
             companyId: c.companyId,
             role: 'client',
-            displayName: c.name || 'Cliente'
+            displayName: c.name || 'Cliente',
+            allowWhatsappAccess: c.allowWhatsappAccess !== false
         };
     }
 
@@ -284,6 +307,15 @@ async function startBaileys() {
             if (!resolvedUser) {
                 console.log(`❌ [MENSAGEM BLOQUEADA] O número ${remoteJid} não está cadastrado em nenhuma empresa no Firestore. Mensagem ignorada.`);
                 return; // Para o fluxo aqui! O bot não responde nada e ignora.
+            }
+
+            // 🔒 VERIFICAÇÃO DE PERMISSÃO DE USO DO WHATSAPP
+            if (resolvedUser.allowWhatsappAccess === false) {
+                console.log(`🚫 [ACESSO NEGADO] Usuário ${resolvedUser.displayName} (${remoteJid}) está com o acesso ao WhatsApp desabilitado.`);
+                await sock.sendMessage(remoteJid, { 
+                    text: "Olá! Seu acesso à NORA via WhatsApp está desativado pelo administrador da sua empresa. Entre em contato com a gestão para solicitar a liberação." 
+                });
+                return;
             }
 
             console.log(`✅ [ACESSO PERMITIDO] Identificado: ${resolvedUser.displayName} (Empresa: ${resolvedUser.companyId} | Papel: ${resolvedUser.role})`);

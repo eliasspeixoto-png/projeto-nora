@@ -26,6 +26,7 @@ const PwaUpdateNotification = () => {
   const pathname = usePathname();
 
   useEffect(() => {
+    if (process.env.NODE_ENV === 'development') return;
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       // Registra o Service Worker e monitora mudanças
       navigator.serviceWorker.getRegistration().then((registration) => {
@@ -49,7 +50,7 @@ const PwaUpdateNotification = () => {
             });
           }
         });
-      });
+      }).catch(() => {});
 
       // 3. Recarrega a página automaticamente quando a nova versão assumir o controle
       let refreshing = false;
@@ -64,12 +65,13 @@ const PwaUpdateNotification = () => {
 
   // Força a checagem de nova versão sempre que o usuário muda de rota (ex: login -> dashboard)
   useEffect(() => {
+    if (process.env.NODE_ENV === 'development') return;
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistration().then((registration) => {
         if (registration) {
-          registration.update();
+          registration.update().catch(() => {});
         }
-      });
+      }).catch(() => {});
     }
   }, [pathname]);
 

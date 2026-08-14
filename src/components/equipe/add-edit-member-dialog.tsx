@@ -16,11 +16,13 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -97,6 +99,7 @@ const baseSchema = z.object({
   avatarUrl: z.string().optional(),
   commissionPercentage: z.coerce.number().min(0, "A comissão não pode ser negativa.").optional(),
   monthlyGoal: z.coerce.number().min(0, "A meta não pode ser negativa.").optional(),
+  allowWhatsappAccess: z.boolean().optional(),
 });
 
 const inviteSchema = baseSchema.extend({
@@ -118,7 +121,7 @@ export default function AddEditMemberDialog({
   onUpdateMember,
   memberToEdit,
 }: AddEditMemberDialogProps) {
-  const { userProfile, company, firebase } = useAuth();
+  const { userProfile, company, firebase, isDeveloper } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingCep, setIsFetchingCep] = useState(false);
@@ -137,6 +140,7 @@ export default function AddEditMemberDialog({
       email: memberToEdit.email || "",
       employmentType: (memberToEdit.employmentType as "CLT" | "freelance") || "CLT",
       role: memberToEdit.role as any,
+      allowWhatsappAccess: memberToEdit.allowWhatsappAccess ?? true,
       phone: memberToEdit.phone || "",
       whatsapp: memberToEdit.whatsapp || "",
       document: memberToEdit.document || "",
@@ -155,6 +159,7 @@ export default function AddEditMemberDialog({
       email: "",
       employmentType: "CLT",
       role: (isDistributor ? "vendedor" : "tecnico") as any,
+      allowWhatsappAccess: true,
       phone: "",
       whatsapp: "",
       document: "",
@@ -179,6 +184,7 @@ export default function AddEditMemberDialog({
           email: memberToEdit.email,
           employmentType: memberToEdit.employmentType || "CLT",
           role: memberToEdit.role as any,
+          allowWhatsappAccess: memberToEdit.allowWhatsappAccess ?? true,
           phone: memberToEdit.phone || "",
           whatsapp: memberToEdit.whatsapp || "",
           document: memberToEdit.document || "",
@@ -199,6 +205,7 @@ export default function AddEditMemberDialog({
           email: "",
           employmentType: "CLT",
           role: isDistributor ? "vendedor" : "tecnico",
+          allowWhatsappAccess: true,
           phone: "",
           whatsapp: "",
           document: "",
@@ -657,11 +664,36 @@ export default function AddEditMemberDialog({
                             <SelectItem value="comprador">Comprador</SelectItem>
                             <SelectItem value="supervisor">Supervisor</SelectItem>
                             <SelectItem value="admin">Administrador</SelectItem>
+                            {isDeveloper && <SelectItem value="developer">Desenvolvedor</SelectItem>}
                           </>
                         )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="allowWhatsappAccess"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between p-4 rounded-2xl border border-border/40 bg-background/50 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-xs font-semibold uppercase tracking-widest text-primary flex items-center gap-2">
+                        <Smartphone className="h-4 w-4 text-green-500" />
+                        Acesso à NORA via WhatsApp
+                      </FormLabel>
+                      <FormDescription className="text-[11px] text-muted-foreground">
+                        Permite que este colaborador converse e envie comandos para a NORA pelo WhatsApp.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value ?? true}
+                        onCheckedChange={field.onChange}
+                        className="data-[state=checked]:bg-green-600"
+                      />
+                    </FormControl>
                   </FormItem>
                 )}
               />

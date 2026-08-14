@@ -65,7 +65,8 @@ export const allMenuItems: MenuItem[] = [
   { href: "/veiculos", label: "Veículos", icon: Car, page: "veiculos", color: "hsl(var(--menu-estoque))" },
   { href: "/visitas", label: "Agendar Visita", icon: Construction, page: "visitas", color: "hsl(var(--menu-estoque))" },
   { href: "/settings", label: "Customizações", icon: Settings, page: "settings", color: "hsl(var(--primary))" },
-  { href: "/cliente/dashboard", label: "Portal do Cliente", icon: UserSquare, page: "cliente", color: "hsl(var(--menu-estoque))" }
+  { href: "/cliente/dashboard", label: "Portal do Cliente", icon: UserSquare, page: "cliente", color: "hsl(var(--menu-estoque))" },
+  { href: "/settings?tab=whatsapp", label: "WhatsApp", icon: Smartphone, page: "whatsapp", color: "hsl(var(--menu-estoque))" }
 ];
 
 const allPages = allMenuItems.map(item => item.page);
@@ -82,11 +83,11 @@ const createFullAccess = (): RolePermissions => {
 export const planPermissions: Record<Company['plan'], string[]> = {
   'Periodo Teste': allPages,
   Essencial: [
-    'dashboard', 'clientes', 'orcamentos', 'ordem-de-servico', 'visitas', 'minhas-os', 'produtos', 'financeiro', 'settings', 'funcionarios', 'cliente', 'lixeira', 'leads'
+    'dashboard', 'clientes', 'orcamentos', 'ordem-de-servico', 'visitas', 'minhas-os', 'produtos', 'financeiro', 'settings', 'funcionarios', 'cliente', 'lixeira', 'leads', 'whatsapp'
   ],
   Profissional: allPages.filter(p => p !== 'fiscal' && p !== 'marketing'),
   Enterprise: allPages,
-  distribuidor: ['dashboard', 'pedidos', 'produtos', 'cliques', 'settings', 'funcionarios', 'lixeira'],
+  distribuidor: ['dashboard', 'pedidos', 'produtos', 'cliques', 'settings', 'funcionarios', 'lixeira', 'whatsapp'],
 };
 
 export const defaultPermissions: Record<Role, RolePermissions> = {
@@ -98,16 +99,19 @@ export const defaultPermissions: Record<Role, RolePermissions> = {
     ferramentas: { view: true, edit: true, delete: false },
     visitas: { view: true, edit: true, delete: false },
     estoque: { view: true, edit: true, delete: false },
+    whatsapp: { view: true, edit: true, delete: false },
   },
   surveyor: {
     'visitas': { view: true, edit: true, delete: true },
     'orcamentos': { view: true, edit: true, delete: false },
+    whatsapp: { view: true, edit: true, delete: false },
   },
   comprador: {
     dashboard: { view: true, edit: false, delete: false },
     compras: { view: true, edit: true, delete: true },
     produtos: { view: true, edit: true, delete: false },
     estoque: { view: true, edit: true, delete: false },
+    whatsapp: { view: true, edit: false, delete: false },
   },
   distribuidor: {
     dashboard: { view: true, edit: false, delete: false },
@@ -117,11 +121,13 @@ export const defaultPermissions: Record<Role, RolePermissions> = {
     pedidos: { view: true, edit: false, delete: false },
     funcionarios: { view: true, edit: true, delete: true },
     lixeira: { view: true, edit: true, delete: true },
+    whatsapp: { view: true, edit: true, delete: false },
   },
   vendedor: {
     dashboard: { view: true, edit: true, delete: true },
     pedidos: { view: true, edit: true, delete: true },
     settings: { view: true, edit: true, delete: false },
+    whatsapp: { view: true, edit: true, delete: false },
   },
   cliente: {
     'cliente': { view: true, edit: false, delete: false },
@@ -173,13 +179,14 @@ export function getAccessibleMenuItems(role: Role, company: Company | null, isDe
   if (isDeveloper) return allMenuItems.filter(item =>
     item.page !== 'settings' &&
     item.page !== 'lixeira' &&
+    item.page !== 'whatsapp' &&
     (item.page !== 'cliques' || role === 'distribuidor') &&
     (item.page !== 'pedidos' || role === 'vendedor' || role === 'distribuidor') &&
     (item.page !== 'cliente' || role === 'cliente')
   ).sort((a, b) => a.label.localeCompare(b.label));
   if (!company && role !== 'distribuidor') return [];
   const accessibleItems = allMenuItems.filter(item => {
-    if (item.page === 'lixeira' || item.page === 'settings') return false;
+    if (item.page === 'lixeira' || item.page === 'settings' || item.page === 'whatsapp') return false;
     return canAccessPage(role, item.page, company);
   });
   const dashboardItem = accessibleItems.find(item => item.page === 'dashboard');

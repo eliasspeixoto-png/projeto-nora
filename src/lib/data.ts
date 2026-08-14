@@ -485,6 +485,7 @@ export type UserProfile = {
   commissionPercentage?: number;
   monthlyGoal?: number;
   fcmToken?: string;
+  allowWhatsappAccess?: boolean;
   pushSettings?: {
     assignments?: boolean;
     messages?: boolean;

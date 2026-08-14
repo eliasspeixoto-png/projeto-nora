@@ -486,7 +486,7 @@ function DistributorSettings() {
 
 
 function SettingsPageContent() {
-  const { company, firebase, setCompany } = useAuth();
+  const { company, firebase, setCompany, isDeveloper } = useAuth();
   const { toast } = useToast();
   const [teamMembers, setTeamMembers] = useState<UserProfile[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -1127,7 +1127,7 @@ function SettingsPageContent() {
                               <div className="p-8 pt-0 space-y-6">
                                   <Form {...form}>
                                       <form className="space-y-6">
-                                          {Object.keys(defaultPermissions).filter(role => role !== 'admin').map((role) => (
+                                          {Object.keys(defaultPermissions).filter(role => role !== 'admin' && (isDeveloper ? true : role !== 'developer')).map((role) => (
                                               <div key={role} className="rounded-[2rem] border border-border/40 bg-background/20 p-8 space-y-6 hover:bg-primary/5 transition-all">
                                                   <div className="flex items-center gap-3 border-b border-border/40 pb-4">
                                                       <div className="p-2 rounded-xl bg-primary/10 text-primary">
