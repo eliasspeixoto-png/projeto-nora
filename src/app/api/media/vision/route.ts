@@ -15,7 +15,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Serviço de visão indisponível (Chave não configurada)' }, { status: 500 });
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
     
     // Convert base64 if it includes the data:image prefix
     const cleanBase64 = base64Image.includes('base64,') ? base64Image.split('base64,')[1] : base64Image;
