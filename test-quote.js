@@ -1,11 +1,20 @@
-const { searchQuoteByCodeAdmin } = require('./src/lib/firebase/admin-db');
+const admin = require('firebase-admin');
+const serviceAccount = require('./sa-temp.json');
 
-async function test() {
-    try {
-        const res = await searchQuoteByCodeAdmin("eliasspeixoto-png/projeto-nora", "OS-0145/26");
-        console.log("Result:", res);
-    } catch (e) {
-        console.error(e);
-    }
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
 }
-test();
+
+const db = admin.firestore();
+
+async function run() {
+  // Update Elias Schuindt Peixoto to admin
+  await db.collection('users').doc('8rudV6YszjfTySDBs449amyqxfz1').update({
+    role: 'admin'
+  });
+  console.log("Updated Elias user to admin!");
+}
+
+run();

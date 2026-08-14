@@ -340,7 +340,6 @@ export const searchQuoteByCodeAdmin = async (companyId: string, code: string, te
     const numberPartNoZeros = numberPart ? parseInt(numberPart, 10).toString() : null;
     
     let query = firestore.collection(QUOTES_COLLECTION).where("companyId", "==", companyId);
-    if (technicianId) query = query.where("assignedTechnicianId", "==", technicianId);
     if (clientId) query = query.where("clientId", "==", clientId);
 
     const snap = await query.get();
@@ -383,18 +382,27 @@ export const searchQuoteByCodeAdmin = async (companyId: string, code: string, te
 
 export const getClientHistoryAdmin = async (companyId: string, clientName: string, technicianId?: string, clientId?: string) => {
     const termNormalized = normalizeString(clientName);
+
+    // 1. Busca primeiro os IDs dos clientes correspondentes
+    const clientsSnap = await firestore.collection(CLIENTS_COLLECTION).where("companyId", "==", companyId).get();
+    const matchingClientIds = clientsSnap.docs
+        .filter(d => {
+            const data = d.data();
+            const nameNorm = normalizeString(data.name || '');
+            const codeNorm = normalizeString(data.clientCode || '');
+            const docClean = (data.document || '').replace(/\D/g, '');
+            const termClean = clientName.replace(/\D/g, '');
+            return nameNorm.includes(termNormalized) || 
+                   codeNorm.includes(termNormalized) || 
+                   (termClean.length >= 8 && docClean.includes(termClean)) ||
+                   d.id === clientId;
+        })
+        .map(d => d.id);
     
     let queryQuotes = firestore.collection(QUOTES_COLLECTION).where("companyId", "==", companyId);
     let queryVisits = firestore.collection(VISITS_COLLECTION).where("companyId", "==", companyId);
     let queryFinance = firestore.collection(ACCOUNTS_RECEIVABLE_COLLECTION).where("companyId", "==", companyId);
 
-    // Filtro de Técnico
-    if (technicianId) {
-        queryQuotes = queryQuotes.where("assignedTechnicianId", "==", technicianId);
-        queryVisits = queryVisits.where("technicianId", "==", technicianId);
-    }
-
-    // Filtro de Cliente
     if (clientId) {
         queryQuotes = queryQuotes.where("clientId", "==", clientId);
         queryVisits = queryVisits.where("clientId", "==", clientId);
@@ -408,9 +416,16 @@ export const getClientHistoryAdmin = async (companyId: string, clientName: strin
         queryFinance.get()
     ]);
 
+    const isMatch = (d: any) => {
+        if (d.deletedAt) return false;
+        if (d.clientId && matchingClientIds.includes(d.clientId)) return true;
+        if (normalizeString(d.clientName || '').includes(termNormalized)) return true;
+        return false;
+    };
+
     const quotes = snapQuotes.docs
         .map(d => ({ id: d.id, ...d.data() } as any))
-        .filter(d => !d.deletedAt && normalizeString(d.clientName || '').includes(termNormalized))
+        .filter(isMatch)
         .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
         .slice(0, 15)
         .map(d => ({
@@ -425,7 +440,7 @@ export const getClientHistoryAdmin = async (companyId: string, clientName: strin
 
     const visits = snapVisits.docs
         .map(d => ({ id: d.id, ...d.data() } as any))
-        .filter(d => !d.deletedAt && normalizeString(d.clientName || '').includes(termNormalized))
+        .filter(isMatch)
         .sort((a, b) => (b.visitDate || '').localeCompare(a.visitDate || ''))
         .slice(0, 15)
         .map(d => ({
@@ -441,7 +456,7 @@ export const getClientHistoryAdmin = async (companyId: string, clientName: strin
 
     const finance = snapFinance.docs
         .map(d => ({ id: d.id, ...d.data() } as any))
-        .filter(d => !d.deletedAt && normalizeString(d.clientName || '').includes(termNormalized))
+        .filter(isMatch)
         .map(d => ({
             descricao: d.description,
             valor: d.amount,
