@@ -374,9 +374,35 @@ export const searchQuoteByCodeAdmin = async (companyId: string, code: string, te
         total: i.total
     }));
 
+    // Busca automaticamente todas as observações, pendências e defeitos vinculados a esta OS
+    const obsSnap = await firestore.collection('observations').where('companyId', '==', companyId).get();
+    const cleanNumber = quote.quoteNumber ? quote.quoteNumber.toLowerCase() : '';
+    const numPart = cleanNumber.match(/\d+/)?.[0] || '';
+    const clientNorm = normalizeString(quote.clientName || '');
+
+    const linkedObservations = obsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(d => {
+            if (d.status && d.status !== 'Ativo') return false;
+            const tags = (d.tags || []).map((t: string) => t.toLowerCase().trim());
+            const textLower = (d.text || '').toLowerCase();
+            return tags.includes(cleanNumber) || 
+                   (numPart && tags.includes(numPart)) ||
+                   tags.some((t: string) => cleanNumber.includes(t) || (numPart && t.includes(numPart))) ||
+                   (clientNorm && tags.some((t: string) => clientNorm.includes(t) || t.includes(clientNorm))) ||
+                   (cleanNumber && textLower.includes(cleanNumber));
+        })
+        .map(d => ({
+            tipo: d.tags?.includes('pendências') || d.tags?.includes('pendencias') ? 'PENDÊNCIA' : (d.tags?.includes('defeito') ? 'DEFEITO' : 'OBSERVAÇÃO'),
+            texto: d.text,
+            autor: d.author,
+            data: d.createdAt
+        }));
+
     return { 
         ...quote,
-        items: cleanItems 
+        items: cleanItems,
+        pendencias_e_observacoes_da_os: linkedObservations
     };
 };
 
