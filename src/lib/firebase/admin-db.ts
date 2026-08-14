@@ -776,10 +776,11 @@ export const getProductsAdmin = async (companyId: string) => {
         .filter(p => !p.deletedAt && p.status !== 'Inativo');
 };
 
-export const addObservationAdmin = async (companyId: string, tags: string[], text: string, author: string) => {
+export const addObservationAdmin = async (companyId: string, tags: string[], text: string, author: string, scope: string = 'local') => {
     try {
+        const targetCompanyId = scope === 'global' ? 'GLOBAL' : companyId;
         const docRef = await firestore.collection('observations').add({
-            companyId,
+            companyId: targetCompanyId,
             tags: tags.map(t => t.toLowerCase().trim()),
             text,
             author,
@@ -794,17 +795,34 @@ export const addObservationAdmin = async (companyId: string, tags: string[], tex
 
 export const searchObservationsAdmin = async (companyId: string, tags: string[]) => {
     try {
-        let query: any = firestore.collection('observations')
+        let queryLocal: any = firestore.collection('observations')
             .where('companyId', '==', companyId)
+            .where('status', '==', 'Ativo');
+            
+        let queryGlobal: any = firestore.collection('observations')
+            .where('companyId', '==', 'GLOBAL')
             .where('status', '==', 'Ativo');
         
         if (tags && tags.length > 0) {
             // Firestore array-contains-any can search up to 10 elements
-            query = query.where('tags', 'array-contains-any', tags.map(t => t.toLowerCase().trim()));
+            const formattedTags = tags.map(t => t.toLowerCase().trim());
+            queryLocal = queryLocal.where('tags', 'array-contains-any', formattedTags);
+            queryGlobal = queryGlobal.where('tags', 'array-contains-any', formattedTags);
         }
         
-        const snap = await query.orderBy('createdAt', 'desc').limit(20).get();
-        return snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+        const [snapLocal, snapGlobal] = await Promise.all([
+            queryLocal.orderBy('createdAt', 'desc').limit(15).get(),
+            queryGlobal.orderBy('createdAt', 'desc').limit(15).get()
+        ]);
+        
+        const localDocs = snapLocal.docs.map((d: any) => ({ id: d.id, ...d.data(), source: 'local' }));
+        const globalDocs = snapGlobal.docs.map((d: any) => ({ id: d.id, ...d.data(), source: 'global' }));
+        
+        const allDocs = [...globalDocs, ...localDocs]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 20);
+            
+        return allDocs;
     } catch (e: any) {
         return { error: 'Falha ao buscar observações: ' + e.message };
     }

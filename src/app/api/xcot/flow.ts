@@ -563,7 +563,8 @@ const tools = [
           type: 'object',
           properties: {
             tags: { type: 'array', items: { type: 'string' }, description: 'Lista de palavras-chave para encontrar esta nota depois (ex: ["BT 019", "Caminhão", "João"]).' },
-            text: { type: 'string', description: 'O texto da observação que deve ser lembrado.' }
+            text: { type: 'string', description: 'O texto da observação que deve ser lembrado.' },
+            scope: { type: 'string', enum: ['local', 'global'], description: 'Se "global", a regra é universal e beneficia todas as empresas sem vazar dados. Se "local", é específica da empresa atual.' }
           },
           required: ['tags', 'text']
         }
@@ -982,7 +983,7 @@ async function executeTool(toolCall: any, context: any) {
         return await bulkUpdateClientsAdmin(companyId, args.updates);
 
       case 'add_observation':
-        return await addObservationAdmin(companyId, args.tags, args.text, displayName);
+          return await addObservationAdmin(companyId, args.tags, args.text, displayName, args.scope || 'local');
 
       case 'search_observations':
         return await searchObservationsAdmin(companyId, args.tags);
@@ -1099,7 +1100,6 @@ CONHECIMENTO ESTRUTURAL DO SISTEMA (OBRIGATÓRIO):
 2. **Terminologias de Contratos:**
    - Para visualizar detalhes de um contrato comodato, oriente clicar em "Ver Proposta".
    - Para baixar o PDF gerado, oriente clicar em "Baixar Contrato".
-    - Para baixar o PDF gerado, oriente clicar em "Baixar Contrato".
    - Para modificar valores ou dados, oriente clicar em "Editar Proposta".
 3. **Gestão de Comodatos:** O sistema suporta dois tipos: "Comodato Real" (a empresa arca com o equipamento) e "Material do Cliente" (o cliente compra o equipamento e paga monitoramento/manutenção). Se perguntarem sobre comodato, saiba dessa diferença crucial. O campo que marca isso no cadastro do cliente é \`isComodato\` (um simples boolean: verdadeiro ou falso).
 4. **Inventário do BD (Onde buscar o quê):**
@@ -1129,10 +1129,11 @@ INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
 3. **DISPARO DE WHATSAPP:** Se o usuário pedir para enviar mensagem a alguém (ex: "envia mensagem para Veridiana...", "pergunta para o Elias..."), você DEVE obrigatoriamente chamar a ferramenta 'send_whatsapp_message'. Jamais afirme que enviou ou confirme plantão/recados de cabeça sem executar a ferramenta e receber a confirmação de sucesso da ferramenta.
 4. **TRANSPARÊNCIA TOTAL:** Nunca responda que uma ação foi realizada ou que uma mensagem foi enviada sem antes ter o retorno real da ferramenta no mesmo fluxo. Se agendou um lembrete, confirme o agendamento; se o usuário quiser auditar envios passados, chame 'check_scheduled_messages'.
 5. **MANDATO INCONDICIONAL DE CONSULTA DE PRODUTOS:** Se o usuário digitar um código numérico, EAN (ex: "798455423628"), nome de modelo ou pedir preço/estoque de um item, você DEVE obrigatoriamente chamar a ferramenta 'search_products'. É ESTRITAMENTE PROIBIDO alegar instabilidade, erro de sistema ou recusar a consulta. Chame 'search_products' sempre no mesmo fluxo!
-6. **MEMÓRIA E APRENDIZADO CONTÍNUO:** Você possui memória contínua de longo prazo. 
-   - Para guardar dados de clientes, chame 'add_observation'. 
-   - **PODER DE APRENDIZADO:** Se o usuário (técnico, administrador ou gestor) te corrigir sobre uma regra técnica, forma de instalação ou combinação de produtos (ex: "Não use a porca B, use a porca A"), você DEVE imediatamente chamar a ferramenta 'add_observation' com as tags `["aprendizado", "regra técnica", NOME_DO_PRODUTO]` para internalizar esse conhecimento.
-   - **CONSULTA DE APRENDIZADO:** Antes de responder perguntas técnicas, sugerir materiais ou dar diagnósticos, você DEVE SEMPRE chamar 'search_observations' passando as tags `["aprendizado"]` ou o nome do equipamento para consultar se você já foi corrigida no passado sobre esse assunto. Jamais repita um erro técnico que já foi corrigido!
+6. **MEMÓRIA DE COLMEIA (APRENDIZADO GLOBAL E LOCAL):** Você possui memória de longo prazo dividida em duas camadas.
+   - Para guardar dados operacionais ou preferências estritas do cliente, chame 'add_observation' com \`scope: "local"\`.
+   - **PODER DE APRENDIZADO:** Se o usuário te corrigir sobre uma regra técnica, forma de instalação ou boa prática universal (ex: "Sempre use bucha X no tijolo Y"), você DEVE chamar a ferramenta 'add_observation' com as tags \`["aprendizado", "regra técnica"]\` E usar o \`scope: "global"\`. Isso injeta o conhecimento na "Mente de Colmeia", beneficiando todas as empresas.
+   - **SIGILO ABSOLUTO:** Você NUNCA deve citar qual empresa te ensinou a regra. Apenas sugira: "Uma boa prática técnica é usar a bucha X...". Jamais vaze informações confidenciais ou nomes de clientes/empresas para a nuvem global.
+   - **CONSULTA DE APRENDIZADO:** Antes de responder perguntas técnicas, sugerir materiais ou dar diagnósticos, você DEVE SEMPRE chamar 'search_observations' passando as tags \`["aprendizado"]\` ou o nome do equipamento para consultar se você já foi corrigida no passado sobre esse assunto. Jamais repita um erro técnico que já foi corrigido!
    - Se o usuário pedir para ser lembrado de algo no futuro, use 'schedule_message'.
 7. **TRAVA DE SEGURANÇA FISCAL E EXCLUSÃO (REGRA EM DUAS ETAPAS):** 
 1. **PROIBIDO EXCLUIR DIRETO:** Você é ESTRITAMENTE PROIBIDA de chamar a ferramenta 'delete_record' no primeiro pedido de exclusão do usuário.
