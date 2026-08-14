@@ -17,10 +17,10 @@ const { useFirestoreAuthState } = require('./use-firestore-auth');
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyAAVXYbvbWE3gXZEgqb6HzVR1UcI7VBz08';
 
 /**
- * Envia uma imagem em Base64 para o Gemini 1.5 Flash para extração de texto e contexto visual.
+ * Envia uma imagem em Base64 para o Gemini 2.5 Flash para extração de texto e contexto visual.
  */
 async function analyzeImageWithGemini(base64Image, mimeType = 'image/jpeg') {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     
     const payload = {
         contents: [{
