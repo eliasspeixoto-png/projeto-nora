@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, User, ListChecks, Search, Save, Trash2, Shield, ShieldQuestion, X, Check, ChevronsUpDown, Edit, Percent, Bot, PlusCircle } from "lucide-react";
 import { getProducts, getClients, addQuote, getCompany, getQuote, updateQuote, updateProduct, addClient } from "@/lib/firebase/firestore";
+import { sendQuoteEmailAction } from "@/app/actions/email-actions";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/firebase/auth/use-user";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -631,6 +632,29 @@ export default function FenceQuotePage() {
                 isNoraNewQuoteRef.current = false;
                 
                 toast({ title: "Sucesso!", description: `Salvo com o número ${quoteNumber}.` });
+
+                // Disparo Automático de E-mail com Link do PDF da Proposta
+                const targetEmail = client?.email || (client?.name?.toLowerCase().includes('elias') ? 'elias.speixoto@gmail.com' : null);
+                if (targetEmail) {
+                    try {
+                        const pdfUrl = `${window.location.origin}/orcamentos/details/${newQuoteId}`;
+                        sendQuoteEmailAction({
+                            to: targetEmail,
+                            clientName: client?.name || 'Cliente',
+                            quoteNumber: quoteNumber || 'ORC-CERCA',
+                            pdfUrl: pdfUrl,
+                            companyName: company?.name || 'ESP-TEC Instalações',
+                            companyEmail: company?.email,
+                            companyAppPassword: (company as any)?.emailAppPassword,
+                        }).then(res => {
+                            if (res?.success) {
+                                toast({ title: "E-mail Enviado!", description: `Proposta com PDF enviada para ${targetEmail}` });
+                            }
+                        }).catch(e => console.error('Erro no envio de email de cerca:', e));
+                    } catch (e) {
+                        console.error('Erro no envio de email de cerca:', e);
+                    }
+                }
                 
                 // Redirecionar para visualização do novo orçamento
                 router.push(`/orcamentos/details/${newQuoteId}`);
