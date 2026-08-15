@@ -660,11 +660,21 @@ export default function QuoteDetailsPage() {
                                             <p className="text-xs text-muted-foreground">Informações de campo registradas pela equipe técnica</p>
                                         </div>
                                     </div>
-                                    {quote.status === 'Finalizado' && (
-                                        <Badge className="bg-emerald-600 text-white font-bold px-3 py-1 self-start sm:self-auto flex items-center gap-1">
-                                            <CheckCircle2 className="h-3.5 w-3.5" /> Serviço Finalizado
-                                        </Badge>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        {quote.status === 'Finalizado' && (
+                                            <Badge className="bg-emerald-600 text-white font-bold px-3 py-1 flex items-center gap-1">
+                                                <CheckCircle2 className="h-3.5 w-3.5" /> Finalizado
+                                            </Badge>
+                                        )}
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-8 font-bold text-xs border-primary/30 text-primary hover:bg-primary/10"
+                                            onClick={() => router.push(`/ordem-de-servico/executar/${quote.id}`)}
+                                        >
+                                            <Edit className="h-3.5 w-3.5 mr-1.5" /> Editar Relatório & Fotos
+                                        </Button>
+                                    </div>
                                 </div>
 
                                 {/* Dados da Equipe e Datas */}
@@ -698,16 +708,42 @@ export default function QuoteDetailsPage() {
                                 </div>
 
                                 {/* Texto do Parecer / Relatório Técnico */}
-                                {quote.notes && (
+                                {quote.notes ? (
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-wider text-foreground/80 flex items-center gap-1.5">
-                                            <MessageSquare className="h-3.5 w-3.5 text-primary" /> Parecer Técnico & Observações do Serviço
-                                        </Label>
+                                        <div className="flex justify-between items-center">
+                                            <Label className="text-xs font-bold uppercase tracking-wider text-foreground/80 flex items-center gap-1.5">
+                                                <MessageSquare className="h-3.5 w-3.5 text-primary" /> Parecer Técnico & Observações do Serviço
+                                            </Label>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-6 px-2 text-[10px] font-bold text-primary hover:bg-primary/10"
+                                                onClick={() => router.push(`/ordem-de-servico/executar/${quote.id}`)}
+                                            >
+                                                <Edit className="h-3 w-3 mr-1" /> Editar Parecer
+                                            </Button>
+                                        </div>
                                         <div className="p-4 rounded-xl bg-blue-50/40 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/30">
                                             <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap font-medium">
                                                 {quote.notes}
                                             </p>
                                         </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                        <div className="space-y-0.5">
+                                            <p className="text-xs font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                                                <HardHat className="h-4 w-4" /> Nenhum parecer técnico digitado
+                                            </p>
+                                            <p className="text-[10px] text-muted-foreground">Você pode registrar o relatório de serviço e fotos a qualquer momento.</p>
+                                        </div>
+                                        <Button 
+                                            size="sm" 
+                                            className="h-8 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                                            onClick={() => router.push(`/ordem-de-servico/executar/${quote.id}`)}
+                                        >
+                                            <Edit className="h-3.5 w-3.5 mr-1.5" /> Preencher Parecer / Fotos
+                                        </Button>
                                     </div>
                                 )}
 

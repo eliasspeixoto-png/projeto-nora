@@ -81,7 +81,9 @@ export default function OsExecutionClient({ initialQuote, initialClient }: OsExe
   const [requiresPreventive, setRequiresPreventive] = useState(initialQuote.requiresPreventiveMaintenance || false);
   const [preventiveFrequency, setPreventiveFrequency] = useState(initialQuote.preventiveMaintenanceFrequency?.toString() || "6");
 
-  const [materialConfirmation, setMaterialConfirmation] = useState<'unanswered' | 'yes' | 'no'>('unanswered');
+  const [materialConfirmation, setMaterialConfirmation] = useState<'unanswered' | 'yes' | 'no'>(
+    initialQuote.status === 'Finalizado' ? 'yes' : 'unanswered'
+  );
   const [materialDiscrepancyNotes, setMaterialDiscrepancyNotes] = useState("");
 
   // Reschedule state
@@ -235,14 +237,19 @@ export default function OsExecutionClient({ initialQuote, initialClient }: OsExe
           await updateClient(firebase.db, client.id, { lastPreventiveMaintenanceDate: completionDate });
         }
         
-        // Dar baixa no estoque físico dos materiais da Ordem de Serviço
-        await decrementStockFromQuote(firebase.db, quote);
-        
-        // Verificar se algum produto ficou com estoque baixo
-        setTimeout(() => checkLowStockAlerts(quote), 2000); // Aguarda um breve momento para garantir que o Firestore atualizou (increment)
+        // Dar baixa no estoque físico dos materiais da Ordem de Serviço apenas se for a primeira finalização
+        if (quote.status !== 'Finalizado') {
+          await decrementStockFromQuote(firebase.db, quote);
+          setTimeout(() => checkLowStockAlerts(quote), 2000);
+        }
       }
       
-      toast({ title: "Sucesso!", description: `Ordem de Serviço marcada como ${newStatus === 'Finalizado' ? 'Finalizada' : 'Pendente de Revisão'}.` });
+      toast({ 
+        title: "Sucesso!", 
+        description: quote.status === 'Finalizado' 
+          ? "Relatório técnico e fotos da O.S. atualizados com sucesso." 
+          : `Ordem de Serviço marcada como ${newStatus === 'Finalizado' ? 'Finalizada' : 'Pendente de Revisão'}.` 
+      });
       
       // Notificar Administradores
       const osNumber = quote.quoteNumber.replace('ORC', 'OS');
@@ -825,9 +832,9 @@ export default function OsExecutionClient({ initialQuote, initialClient }: OsExe
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            <Button onClick={handleFinishOS} disabled={isSaving} className="bg-green-600 hover:bg-green-700">
-                {isSaving ? <Loader2 className="animate-spin" /> : <Check className="mr-2" />}
-                Finalizar Serviço
+            <Button onClick={handleFinishOS} disabled={isSaving} className="bg-green-600 hover:bg-green-700 shadow-md">
+                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Check className="mr-2" />}
+                {quote.status === 'Finalizado' ? 'Salvar Alterações da O.S.' : 'Finalizar Serviço'}
             </Button>
         </div>
 

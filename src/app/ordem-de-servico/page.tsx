@@ -504,6 +504,13 @@ export default function OrdemDeServicoPage() {
                                                                 </Button>
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end" className="p-2 rounded-2xl bg-background/95 backdrop-blur-3xl border-border/40 shadow-premium z-50">
+                                                                <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => router.push(`/ordem-de-servico/executar/${os.id}`)}>
+                                                                    <HardHat className="mr-2 h-3.5 w-3.5 text-primary" />
+                                                                    {os.status === 'Finalizado' ? 'Editar Relatório & Fotos' : 'Executar Serviço'}
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => router.push(`/ordem-de-servico/editar/${os.id}`)}>
+                                                                    <Edit className="mr-2 h-3.5 w-3.5" />Editar O.S. / Materiais
+                                                                </DropdownMenuItem>
                                                                 <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => handleSchedule(os)}><CalendarRange className="mr-2 h-3.5 w-3.5" />Cronograma / Atribuir</DropdownMenuItem>
                                                                 <DropdownMenuItem className="h-9 rounded-xl font-semibold text-green-600 cursor-pointer text-xs" onClick={() => handleOpenAdvance(os)}><DollarSign className="mr-2 h-3.5 w-3.5" />Lançar Adiantamento</DropdownMenuItem>
                                                                 {!os.isChildOS && (
@@ -512,7 +519,6 @@ export default function OrdemDeServicoPage() {
                                                                 {os.status === 'revision-pending' && (
                                                                     <DropdownMenuItem className="h-9 rounded-xl font-semibold text-green-600 cursor-pointer text-xs" onClick={() => handleConfirmRevision(os.id)}><Check className="mr-2 h-3.5 w-3.5" />Confirmar Revisão</DropdownMenuItem>
                                                                 )}
-                                                                <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => router.push(`/ordem-de-servico/executar/${os.id}`)}><Edit className="mr-2 h-3.5 w-3.5" />Executar</DropdownMenuItem>
                                                                 <DropdownMenuSeparator className="bg-primary/5" />
                                                                 <DropdownMenuItem className="h-9 rounded-xl font-semibold text-destructive cursor-pointer text-xs" onClick={() => confirmDelete(os.id)}><Trash2 className="mr-2 h-3.5 w-3.5" />Excluir</DropdownMenuItem>
                                                             </DropdownMenuContent>
@@ -553,25 +559,21 @@ export default function OrdemDeServicoPage() {
                                                     >
                                                         <TableCell className="py-0 font-semibold text-xs px-6 truncate text-foreground">
                                                             <div className="flex items-center gap-1.5">
-                                                                <span>{os.quoteNumber.replace('ORC', 'OS')}</span>
-                                                                {os.isChildOS && (
-                                                                    <Badge variant="secondary" className="h-4 px-1.5 text-[8px] font-bold opacity-70">
-                                                                        {os.childOSIndex}/{os.childOSCount}
-                                                                    </Badge>
-                                                                )}
+                                                                <HardHat className="h-3.5 w-3.5 text-primary opacity-60 group-hover:opacity-100 transition-opacity" />
+                                                                <span className="font-bold">{os.quoteNumber.replace('ORC', 'OS')}</span>
                                                             </div>
                                                         </TableCell>
-                                                        <TableCell className="py-0 text-xs px-6 truncate max-w-[150px]">
+                                                        <TableCell className="py-0 px-6">
                                                             {os.unitIdentifier ? (
-                                                                <Badge variant="outline" className="h-5 px-2 text-[10px] font-bold bg-primary/5 text-primary border-primary/20 flex items-center gap-1 w-fit">
-                                                                    <Tag className="h-2.5 w-2.5" /> {os.unitIdentifier}
+                                                                <Badge variant="outline" className="font-bold text-[10px] bg-primary/10 text-primary border-primary/20">
+                                                                    <Tag className="h-3 w-3 mr-1" /> {os.unitIdentifier}
                                                                 </Badge>
                                                             ) : (
-                                                                <span className="opacity-40 text-[11px]">—</span>
+                                                                <span className="text-[10px] text-muted-foreground italic">Geral</span>
                                                             )}
                                                         </TableCell>
-                                                        <TableCell className="py-0 text-xs font-semibold px-6 truncate max-w-[180px] opacity-80 text-foreground uppercase">{os.clientName}</TableCell>
-                                                        <TableCell className="py-0 text-xs font-medium px-6 text-foreground">
+                                                        <TableCell className="py-0 text-xs font-semibold px-6 truncate max-w-[180px] text-foreground">{os.clientName}</TableCell>
+                                                        <TableCell className="py-0 text-xs px-6">
                                                             <div className="flex flex-col text-[11px] leading-tight">
                                                                 <span className="font-semibold text-foreground/90">{formatDate(os.scheduledDate)} {os.scheduledTime}</span>
                                                                 {os.expectedEndDate && (
@@ -602,6 +604,13 @@ export default function OrdemDeServicoPage() {
                                                                 </DropdownMenuTrigger>
                                                                 <DropdownMenuContent align="end" className="p-2 rounded-2xl bg-background/95 backdrop-blur-3xl border-border/40 shadow-premium z-50">
                                                                     <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => setViewingOS(os)}><Eye className="mr-2 h-3.5 w-3.5" />Visualizar</DropdownMenuItem>
+                                                                    <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => router.push(`/ordem-de-servico/executar/${os.id}`)}>
+                                                                        <HardHat className="mr-2 h-3.5 w-3.5 text-primary" />
+                                                                        {os.status === 'Finalizado' ? 'Editar Relatório & Fotos' : 'Executar Serviço'}
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => router.push(`/ordem-de-servico/editar/${os.id}`)}>
+                                                                        <Edit className="mr-2 h-3.5 w-3.5" />Editar O.S. / Materiais
+                                                                    </DropdownMenuItem>
                                                                     <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => handleSchedule(os)}><CalendarRange className="mr-2 h-3.5 w-3.5" />Cronograma / Atribuir</DropdownMenuItem>
                                                                     <DropdownMenuItem className="h-9 rounded-xl font-semibold text-green-600 cursor-pointer text-xs" onClick={() => handleOpenAdvance(os)}><DollarSign className="mr-2 h-3.5 w-3.5" />Lançar Adiantamento</DropdownMenuItem>
                                                                     {!os.isChildOS && (
@@ -610,7 +619,6 @@ export default function OrdemDeServicoPage() {
                                                                     {os.status === 'revision-pending' && (
                                                                         <DropdownMenuItem className="h-9 rounded-xl font-semibold text-green-600 cursor-pointer text-xs" onClick={() => handleConfirmRevision(os.id)}><Check className="mr-2 h-3.5 w-3.5" />Confirmar Revisão</DropdownMenuItem>
                                                                     )}
-                                                                    <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => router.push(`/ordem-de-servico/executar/${os.id}`)}><Edit className="mr-2 h-3.5 w-3.5" />Executar</DropdownMenuItem>
                                                                     <DropdownMenuSeparator className="bg-primary/5" />
                                                                     <DropdownMenuItem className="h-9 rounded-xl font-semibold text-destructive cursor-pointer text-xs" onClick={() => confirmDelete(os.id)}><Trash2 className="mr-2 h-3.5 w-3.5" />Excluir</DropdownMenuItem>
                                                                 </DropdownMenuContent>
@@ -871,17 +879,31 @@ export default function OrdemDeServicoPage() {
                                     )}
 
                                     {/* Relatório Técnico de Conclusão / Execução */}
-                                    {viewingOS.notes && (
+                                    {viewingOS.notes ? (
                                         <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40 space-y-2">
                                             <div className="flex justify-between items-center">
                                                 <Label className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
                                                     <HardHat className="h-4 w-4" /> Relatório Técnico de Serviço
                                                 </Label>
-                                                {viewingOS.completionDate && (
-                                                    <span className="text-[10px] font-semibold opacity-60">
-                                                        Concluído em: {formatDateTimeSafe(viewingOS.completionDate)}
-                                                    </span>
-                                                )}
+                                                <div className="flex items-center gap-2">
+                                                    {viewingOS.completionDate && (
+                                                        <span className="text-[10px] font-semibold opacity-60">
+                                                            Concluído em: {formatDateTimeSafe(viewingOS.completionDate)}
+                                                        </span>
+                                                    )}
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-6 px-2 text-[10px] font-bold text-primary hover:bg-primary/10"
+                                                        onClick={() => {
+                                                            const id = viewingOS.id;
+                                                            setViewingOS(null);
+                                                            router.push(`/ordem-de-servico/executar/${id}`);
+                                                        }}
+                                                    >
+                                                        <Edit className="h-3 w-3 mr-1" /> Editar
+                                                    </Button>
+                                                </div>
                                             </div>
                                             <div className="p-3 rounded-lg bg-background/90 border border-border/40">
                                                 <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap font-medium">
@@ -902,10 +924,30 @@ export default function OrdemDeServicoPage() {
                                                 )}
                                             </div>
                                         </div>
+                                    ) : (
+                                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                            <div className="space-y-0.5">
+                                                <p className="text-xs font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                                                    <HardHat className="h-4 w-4" /> Nenhum parecer técnico digitado
+                                                </p>
+                                                <p className="text-[10px] text-muted-foreground">Você pode registrar o relatório de serviço e fotos a qualquer momento.</p>
+                                            </div>
+                                            <Button 
+                                                size="sm" 
+                                                className="h-8 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                                                onClick={() => { 
+                                                    const id = viewingOS.id; 
+                                                    setViewingOS(null); 
+                                                    router.push(`/ordem-de-servico/executar/${id}`); 
+                                                }}
+                                            >
+                                                <Edit className="h-3.5 w-3.5 mr-1.5" /> Preencher Parecer / Fotos
+                                            </Button>
+                                        </div>
                                     )}
 
                                     {/* Galeria de Fotos Anexadas pelo Técnico */}
-                                    {viewingOS.serviceImages && viewingOS.serviceImages.length > 0 && (
+                                    {viewingOS.serviceImages && viewingOS.serviceImages.length > 0 ? (
                                         <div className="p-4 rounded-xl bg-muted/30 border border-border/40 space-y-3">
                                             <div className="flex justify-between items-center">
                                                 <Label className="text-[10px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
@@ -935,7 +977,7 @@ export default function OrdemDeServicoPage() {
                                                 ))}
                                             </div>
                                         </div>
-                                    )}
+                                    ) : null}
 
                                     {/* Linha do Tempo (Atividades) */}
                                     <div className="space-y-4">
@@ -984,7 +1026,7 @@ export default function OrdemDeServicoPage() {
                                 </div>
 
                                 {/* Ações do Rodapé */}
-                                <div className="p-6 bg-muted/30 border-t border-border/40 grid grid-cols-2 gap-3">
+                                <div className="p-6 bg-muted/30 border-t border-border/40 grid grid-cols-3 gap-2">
                                     <Button
                                         variant="outline"
                                         className="h-10 rounded-xl font-bold uppercase tracking-widest border-border/40 hover:bg-background bg-stone-100 dark:bg-stone-800/50 border-stone-200 dark:border-stone-700 text-[10px]"
@@ -994,7 +1036,18 @@ export default function OrdemDeServicoPage() {
                                             router.push(`/orcamentos/details/${os.id}`);
                                         }}
                                     >
-                                        <Eye className="mr-2 h-4 w-4 text-primary" /> Detalhes Completos
+                                        <Eye className="mr-1.5 h-3.5 w-3.5 text-primary" /> Detalhes
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="h-10 rounded-xl font-bold uppercase tracking-widest border-primary/20 text-primary hover:bg-primary/10 text-[10px]"
+                                        onClick={() => {
+                                            const os = viewingOS;
+                                            setViewingOS(null);
+                                            router.push(`/ordem-de-servico/executar/${os.id}`);
+                                        }}
+                                    >
+                                        <HardHat className="mr-1.5 h-3.5 w-3.5" /> Editar Execução
                                     </Button>
                                     <Button
                                         className="h-10 rounded-xl font-bold uppercase tracking-widest bg-primary text-white hover:scale-[1.02] active:scale-95 transition-all text-[10px] shadow-lg shadow-primary/20"
