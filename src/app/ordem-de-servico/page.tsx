@@ -64,6 +64,7 @@ export default function OrdemDeServicoPage() {
     const [osToSchedule, setOsToSchedule] = useState<Quote | null>(null);
     const [osReturns, setOsReturns] = useState<OSReturn[]>([]);
     const [viewingOS, setViewingOS] = useState<Quote | null>(null);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [osToDelete, setOsToDelete] = useState<string | null>(null);
     const [isScheduleOpen, setScheduleOpen] = useState(false);
 
@@ -869,6 +870,73 @@ export default function OrdemDeServicoPage() {
                                         </div>
                                     )}
 
+                                    {/* Relatório Técnico de Conclusão / Execução */}
+                                    {viewingOS.notes && (
+                                        <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40 space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                                                    <HardHat className="h-4 w-4" /> Relatório Técnico de Serviço
+                                                </Label>
+                                                {viewingOS.completionDate && (
+                                                    <span className="text-[10px] font-semibold opacity-60">
+                                                        Concluído em: {formatDateTimeSafe(viewingOS.completionDate)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="p-3 rounded-lg bg-background/90 border border-border/40">
+                                                <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap font-medium">
+                                                    {viewingOS.notes}
+                                                </p>
+                                            </div>
+                                            <div className="flex justify-between items-center pt-1 text-[10px] opacity-75">
+                                                <span>Técnico: <strong className="text-foreground">{viewingOS.assignedTechnicianName || 'Não informado'}</strong></span>
+                                                {viewingOS.completionLocation && (
+                                                    <a 
+                                                        href={`https://www.google.com/maps/search/?api=1&query=${viewingOS.completionLocation.latitude},${viewingOS.completionLocation.longitude}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-primary font-bold hover:underline flex items-center gap-1"
+                                                    >
+                                                        <MapPin className="h-3 w-3" /> Ver GPS de Encerramento
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Galeria de Fotos Anexadas pelo Técnico */}
+                                    {viewingOS.serviceImages && viewingOS.serviceImages.length > 0 && (
+                                        <div className="p-4 rounded-xl bg-muted/30 border border-border/40 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                                                    <Eye className="h-4 w-4" /> Fotos do Serviço ({viewingOS.serviceImages.length})
+                                                </Label>
+                                                <span className="text-[9px] text-muted-foreground font-semibold">Clique para ampliar</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                                                {viewingOS.serviceImages.map((imgUrl, idx) => (
+                                                    <div 
+                                                        key={idx} 
+                                                        className="group relative aspect-square rounded-xl overflow-hidden border border-border/40 cursor-pointer hover:scale-105 transition-all shadow-sm bg-background"
+                                                        onClick={() => setPreviewImage(imgUrl)}
+                                                    >
+                                                        <img 
+                                                            src={imgUrl} 
+                                                            alt={`Foto ${idx + 1}`} 
+                                                            className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" 
+                                                        />
+                                                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                            <Eye className="h-5 w-5 text-white" />
+                                                        </div>
+                                                        <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">
+                                                            #{idx + 1}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Linha do Tempo (Atividades) */}
                                     <div className="space-y-4">
                                         <Label className="text-[10px] font-semibold uppercase tracking-[0.2em] opacity-40 px-1">Atividade Técnica</Label>
@@ -926,7 +994,7 @@ export default function OrdemDeServicoPage() {
                                             router.push(`/orcamentos/details/${os.id}`);
                                         }}
                                     >
-                                        <Eye className="mr-2 h-4 w-4 text-primary" /> Detalhes
+                                        <Eye className="mr-2 h-4 w-4 text-primary" /> Detalhes Completos
                                     </Button>
                                     <Button
                                         className="h-10 rounded-xl font-bold uppercase tracking-widest bg-primary text-white hover:scale-[1.02] active:scale-95 transition-all text-[10px] shadow-lg shadow-primary/20"
@@ -969,6 +1037,19 @@ export default function OrdemDeServicoPage() {
                     quote={osForAdvance}
                 />
             )}
+
+            {/* Modal de Zoom de Foto */}
+            <Dialog open={!!previewImage} onOpenChange={(open) => !open && setPreviewImage(null)}>
+                <DialogContent className="max-w-3xl p-2 bg-black/90 border-none shadow-2xl overflow-hidden flex items-center justify-center">
+                    {previewImage && (
+                        <img 
+                            src={previewImage} 
+                            alt="Foto do Serviço em Alta Resolução" 
+                            className="max-h-[85vh] w-auto object-contain rounded-lg" 
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { getQuote, getClient, getCompany, updateQuote } from "@/lib/firebase/firestore";
 import type { Quote, Client, Company } from "@/lib/data";
-import { Loader2, Printer, ArrowLeft, FileDown, Percent, MessageSquare, XCircle, ImageIcon, RotateCcw, RotateCw, Share2, Mail, Copy, Check, Eye, Shield, HardHat, Info, Send, Smartphone, Edit } from "lucide-react";
+import { Loader2, Printer, ArrowLeft, FileDown, Percent, MessageSquare, XCircle, ImageIcon, RotateCcw, RotateCw, Share2, Mail, Copy, Check, Eye, Shield, HardHat, Info, Send, Smartphone, Edit, MapPin, Tag, Calendar, User, Clock, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -640,25 +640,125 @@ export default function QuoteDetailsPage() {
 
                         {renderContent()}
 
-                        {quote.serviceImages && quote.serviceImages.length > 0 && (
-                            <div className="max-w-4xl mx-auto bg-card p-4 md:p-8 rounded-lg shadow-sm mt-4">
-                                <Card className="print:break-before-page">
-                                    <CardHeader>
-                                        <CardTitle className="font-semibold text-xl">Fotos do Serviço Executado</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {/* Bloco de Relatório de Execução Técnica da O.S. */}
+                        {(quote.notes || (quote.serviceImages && quote.serviceImages.length > 0) || quote.completionLocation || quote.assignedTechnicianName) && (
+                            <div className="max-w-4xl mx-auto bg-card p-4 md:p-8 rounded-lg shadow-sm mt-6 space-y-6 print:break-before-page border border-border/40">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/40">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                                            <HardHat className="h-6 w-6" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
+                                                Relatório Técnico de Execução
+                                                {quote.unitIdentifier && (
+                                                    <Badge variant="outline" className="text-xs font-bold bg-primary/10 text-primary border-primary/20">
+                                                        <Tag className="h-3 w-3 mr-1" /> {quote.unitIdentifier}
+                                                    </Badge>
+                                                )}
+                                            </h3>
+                                            <p className="text-xs text-muted-foreground">Informações de campo registradas pela equipe técnica</p>
+                                        </div>
+                                    </div>
+                                    {quote.status === 'Finalizado' && (
+                                        <Badge className="bg-emerald-600 text-white font-bold px-3 py-1 self-start sm:self-auto flex items-center gap-1">
+                                            <CheckCircle2 className="h-3.5 w-3.5" /> Serviço Finalizado
+                                        </Badge>
+                                    )}
+                                </div>
+
+                                {/* Dados da Equipe e Datas */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <div className="p-4 rounded-xl bg-muted/40 border border-border/40 space-y-1">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                            <User className="h-3.5 w-3.5 text-primary" /> Técnico Responsável
+                                        </span>
+                                        <p className="font-bold text-sm text-foreground/90">
+                                            {quote.assignedTechnicianName || 'Não atribuído'}
+                                        </p>
+                                    </div>
+
+                                    <div className="p-4 rounded-xl bg-muted/40 border border-border/40 space-y-1">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                            <Calendar className="h-3.5 w-3.5 text-primary" /> Início do Atendimento
+                                        </span>
+                                        <p className="font-bold text-sm text-foreground/90">
+                                            {quote.scheduledDate ? `${new Date(`${quote.scheduledDate}T00:00:00`).toLocaleDateString('pt-BR')} às ${quote.scheduledTime || '09:00'}` : 'Não agendado'}
+                                        </p>
+                                    </div>
+
+                                    <div className="p-4 rounded-xl bg-muted/40 border border-border/40 space-y-1">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                            <Clock className="h-3.5 w-3.5 text-primary" /> Conclusão do Serviço
+                                        </span>
+                                        <p className="font-bold text-sm text-blue-600 dark:text-blue-400">
+                                            {quote.completionDate ? new Date(quote.completionDate).toLocaleString('pt-BR') : (quote.expectedEndDate ? `Previsão: ${new Date(`${quote.expectedEndDate}T00:00:00`).toLocaleDateString('pt-BR')}` : 'Em andamento')}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Texto do Parecer / Relatório Técnico */}
+                                {quote.notes && (
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-foreground/80 flex items-center gap-1.5">
+                                            <MessageSquare className="h-3.5 w-3.5 text-primary" /> Parecer Técnico & Observações do Serviço
+                                        </Label>
+                                        <div className="p-4 rounded-xl bg-blue-50/40 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/30">
+                                            <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap font-medium">
+                                                {quote.notes}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* GPS de Conclusão */}
+                                {quote.completionLocation && (
+                                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-muted/30 border border-border/40">
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <MapPin className="h-4 w-4 text-destructive shrink-0" />
+                                            <span>
+                                                Localização GPS registrada no encerramento: <strong>{quote.completionLocation.latitude.toFixed(6)}, {quote.completionLocation.longitude.toFixed(6)}</strong>
+                                            </span>
+                                        </div>
+                                        <a 
+                                            href={`https://www.google.com/maps/search/?api=1&query=${quote.completionLocation.latitude},${quote.completionLocation.longitude}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs font-bold text-primary hover:underline flex items-center gap-1 shrink-0 ml-2"
+                                        >
+                                            Abrir no Google Maps ↗
+                                        </a>
+                                    </div>
+                                )}
+
+                                {/* Fotos Anexadas pelo Técnico */}
+                                {quote.serviceImages && quote.serviceImages.length > 0 && (
+                                    <div className="space-y-3 pt-2">
+                                        <div className="flex justify-between items-center">
+                                            <Label className="text-xs font-bold uppercase tracking-wider text-foreground/80 flex items-center gap-1.5">
+                                                <ImageIcon className="h-4 w-4 text-primary" /> Fotos do Serviço Executado ({quote.serviceImages.length})
+                                            </Label>
+                                            <span className="text-[10px] text-muted-foreground">Clique para ampliar ou girar</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
                                             {quote.serviceImages.map((imageUrl, index) => (
-                                                <div key={index} className="relative aspect-square cursor-pointer rounded-md border overflow-hidden group" onClick={() => handleImageClick(imageUrl)}>
+                                                <div 
+                                                    key={index} 
+                                                    className="relative aspect-square cursor-pointer rounded-xl border border-border/40 overflow-hidden group shadow-sm hover:scale-105 transition-all bg-background" 
+                                                    onClick={() => handleImageClick(imageUrl)}
+                                                >
                                                     <Image src={imageUrl} alt={`Serviço executado ${index + 1}`} fill style={{ objectFit: "cover" }} sizes="(max-width: 768px) 50vw, 33vw" />
-                                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center print:hidden">
-                                                        <ImageIcon className="text-white h-8 w-8" />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center print:hidden">
+                                                        <Eye className="text-white h-6 w-6" />
                                                     </div>
+                                                    <span className="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[9px] font-bold px-2 py-0.5 rounded-md">
+                                                        Foto #{index + 1}
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
-                                    </CardContent>
-                                </Card>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
