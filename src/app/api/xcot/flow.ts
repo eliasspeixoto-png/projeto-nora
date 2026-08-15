@@ -1061,7 +1061,7 @@ async function executeTool(toolCall: any, context: any) {
 
       case 'send_email': {
         try {
-          const { sendGmail } = await import('@/lib/mail/gmail');
+          const { sendUniversalEmail } = await import('@/lib/mail/dispatcher');
           const htmlBody = `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
               <div style="background-color: #0f172a; padding: 24px; text-align: center;">
@@ -1084,14 +1084,14 @@ async function executeTool(toolCall: any, context: any) {
               </div>
             </div>
           `;
-          const res = await sendGmail({
+          const res = await sendUniversalEmail({
             to: args.to,
             subject: args.subject,
             text: args.messageText,
             html: htmlBody
           });
           if (res.success) {
-            return { success: true, message: `E-mail enviado com sucesso para ${args.to} via Gmail API.` };
+            return { success: true, message: `E-mail enviado com sucesso para ${args.to} (via ${res.provider}).` };
           } else {
             return { error: `Falha ao enviar e-mail: ${res.error}` };
           }
