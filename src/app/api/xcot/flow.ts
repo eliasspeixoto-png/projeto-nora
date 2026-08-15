@@ -560,6 +560,24 @@ const tools = [
     {
       type: 'function',
       function: {
+        name: 'send_email',
+        description: 'Dispara um e-mail real via Gmail API contendo orçamento, relatório, proposta ou mensagem para o cliente, diretor ou funcionário. Use sempre que o usuário pedir para enviar e-mail.',
+        parameters: {
+          type: 'object',
+          properties: {
+            to: { type: 'string', description: 'Endereço de e-mail do destinatário (ex: "elias.speixoto@gmail.com").' },
+            subject: { type: 'string', description: 'Assunto do e-mail (ex: "Orçamento Cerca Elétrica - ESP-TEC").' },
+            messageText: { type: 'string', description: 'Conteúdo/corpo do e-mail detalhado em texto formatado.' },
+            quoteNumber: { type: 'string', description: 'Número do orçamento relacionado (se houver, ex: "ORC-0145/26").' },
+            pdfUrl: { type: 'string', description: 'Link do PDF ou proposta pública se aplicável.' }
+          },
+          required: ['to', 'subject', 'messageText']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
         name: 'settle_receivable',
         description: 'Dá baixa / marca como Pago em uma ou mais contas a receber do financeiro pelo nome do cliente (ex: "Fabio Fontes"), pelo número da OS/Orçamento (ex: "ORC-0122/26") ou pelo ID da fatura.',
         parameters: {
@@ -1041,6 +1059,47 @@ async function executeTool(toolCall: any, context: any) {
       case 'add_os_note':
         return await addOSNoteAdmin(companyId, args.osCode, args.type, args.text, displayName);
 
+      case 'send_email': {
+        try {
+          const { sendGmail } = await import('@/lib/mail/gmail');
+          const htmlBody = `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+              <div style="background-color: #0f172a; padding: 24px; text-align: center;">
+                <h2 style="color: #38bdf8; margin: 0; font-size: 20px; font-weight: bold;">ESP-TEC Instalações</h2>
+                <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;">Assistente Virtual NORA Pro</p>
+              </div>
+              <div style="padding: 28px; line-height: 1.6; color: #334155;">
+                <h3 style="color: #0f172a; margin-top: 0; font-size: 16px;">${args.subject}</h3>
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 8px; font-size: 14px; white-space: pre-wrap; color: #1e293b;">${args.messageText}</div>
+                ${args.pdfUrl ? `
+                  <div style="text-align: center; margin: 28px 0;">
+                    <a href="${args.pdfUrl}" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+                      Visualizar Orçamento / Documento Online ↗
+                    </a>
+                  </div>
+                ` : ''}
+                <p style="font-size: 12px; color: #94a3b8; margin-top: 28px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+                  Mensagem enviada automaticamente pela NORA Pro em nome de ${displayName}.
+                </p>
+              </div>
+            </div>
+          `;
+          const res = await sendGmail({
+            to: args.to,
+            subject: args.subject,
+            text: args.messageText,
+            html: htmlBody
+          });
+          if (res.success) {
+            return { success: true, message: `E-mail enviado com sucesso para ${args.to} via Gmail API.` };
+          } else {
+            return { error: `Falha ao enviar e-mail: ${res.error}` };
+          }
+        } catch (e: any) {
+          return { error: `Erro na execução do envio de e-mail: ${e.message}` };
+        }
+      }
+
       case 'get_budget_pending_summary':
         return await getBudgetPendingSummaryAdmin(companyId, args.budgetCode);
 
@@ -1076,10 +1135,10 @@ async function executeTool(toolCall: any, context: any) {
       case 'check_scheduled_messages': {
         const snap = await firestore.collection('scheduled_messages')
             .where("companyId", "==", companyId)
-            .orderBy('createdAt', 'desc')
-            .limit(10)
             .get();
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+        docs.sort((a, b) => ((b.createdAt || '') > (a.createdAt || '') ? 1 : -1));
+        return docs.slice(0, 10);
       }
 
       case 'cadastrar_nota_fiscal':
