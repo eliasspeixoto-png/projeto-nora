@@ -18,6 +18,9 @@ type TaskProps = {
   technicianName?: string;
   date?: string;
   time?: string;
+  expectedEndDate?: string;
+  expectedEndTime?: string;
+  unitIdentifier?: string;
   address: string;
   phone: string;
   description?: string;
@@ -65,21 +68,28 @@ export default function TaskCard({
   onClick?: () => void;
 }) {
   const isOs = task.type === 'Ordem de Serviço';
-  const visitDateTime = task.date && task.time ? parseISO(`${task.date}T${task.time}:00`) : null;
-  const isOverdue = visitDateTime && isPast(visitDateTime) && !['Finalizado', 'Finalizada'].includes(task.status);
+  const targetDate = task.expectedEndDate || task.date;
+  const targetTime = task.expectedEndDate ? (task.expectedEndTime || '23:59') : (task.time || '23:59');
+  const visitDateTime = targetDate ? parseISO(`${targetDate}T${targetTime}:00`) : null;
+  const isOverdue = visitDateTime && isPast(visitDateTime) && !['Finalizado', 'Finalizada', 'rejected'].includes(task.status);
   const displayStatus = isOverdue ? 'Atrasada' : task.status;
-  const currentStatus = statusConfig[displayStatus] || { label: "Desconhecido", variant: "secondary", icon: HardHat };
+  const currentStatus = statusConfig[displayStatus] || { label: displayStatus, variant: "secondary", icon: HardHat };
   const TaskIcon = isOs ? HardHat : Construction;
 
   return (
     <div className="p-6 space-y-4 cursor-pointer h-full flex flex-col group bg-background/40 backdrop-blur-3xl rounded-[2rem] shadow-premium border-none transition-all duration-300 hover:scale-[1.02] active:scale-95" onClick={onClick}>
         <div className="flex justify-between items-start gap-4">
              <div className="space-y-1 flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <div className="p-2 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors duration-500">
                         <TaskIcon className="h-4 w-4" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest opacity-40">{task.type}</span>
+                    {task.unitIdentifier && (
+                        <Badge variant="outline" className="h-5 px-2 font-bold text-[9px] bg-primary/10 text-primary border-primary/20">
+                            {task.unitIdentifier}
+                        </Badge>
+                    )}
                 </div>
                 <CardTitle className="text-xl font-semibold tracking-tight truncate text-foreground/90">
                     {task.number}
@@ -106,13 +116,15 @@ export default function TaskCard({
             </div>
             
             <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/40">
-                <div className="flex items-center gap-2 opacity-60">
-                    <Clock className="h-3 w-3 text-primary" />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider">{formatDate(task.date)}</span>
+                <div className="flex flex-col opacity-75">
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Início</span>
+                    <span className="text-[11px] font-bold text-foreground/90">{formatDate(task.date)} {task.time}</span>
                 </div>
-                <div className="flex items-center gap-2 opacity-60">
-                    <Clock className="h-3 w-3 text-primary" />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider">{task.time}</span>
+                <div className="flex flex-col opacity-75">
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Previsão Término</span>
+                    <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                        {task.expectedEndDate ? formatDate(task.expectedEndDate) : 'Mesmo dia'}
+                    </span>
                 </div>
             </div>
 
