@@ -834,9 +834,12 @@ export const addOSNoteAdmin = async (companyId: string, osCodeOrId: string, type
         const numberPartNoZeros = numberPart ? parseInt(numberPart, 10).toString() : null;
 
         let snap = await firestore.collection(QUOTES_COLLECTION).where("companyId", "==", companyId).get();
+        
+        // Busca por ID exato, código de O.S. ou por Placa / TAG / Identificador de Unidade
         let docMatch = snap.docs.find(d => {
             const data = d.data();
             if (d.id === osCodeOrId) return true;
+            if (data.unitIdentifier && data.unitIdentifier.toUpperCase().includes(term)) return true;
             if (!data.quoteNumber) return false;
             const qNum = data.quoteNumber.toUpperCase();
             return qNum === term || 
@@ -848,6 +851,7 @@ export const addOSNoteAdmin = async (companyId: string, osCodeOrId: string, type
         if (!docMatch && numberPartNoZeros) {
             docMatch = snap.docs.find(d => {
                 const data = d.data();
+                if (data.unitIdentifier && data.unitIdentifier.toUpperCase().includes(term)) return true;
                 if (!data.quoteNumber) return false;
                 return data.quoteNumber.includes(numberPart) ||
                        data.quoteNumber.includes(`-${numberPartNoZeros}/`) ||
@@ -856,7 +860,7 @@ export const addOSNoteAdmin = async (companyId: string, osCodeOrId: string, type
         }
 
         if (!docMatch) {
-            return { error: `Ordem de Serviço ${osCodeOrId} não encontrada no sistema.` };
+            return { error: `Ordem de Serviço ou Unidade "${osCodeOrId}" não encontrada no sistema.` };
         }
 
         const newNote = {
@@ -874,14 +878,84 @@ export const addOSNoteAdmin = async (companyId: string, osCodeOrId: string, type
             osNotes: [...existingNotes, newNote]
         });
 
+        const unitTag = docMatch.data().unitIdentifier ? ` (${docMatch.data().unitIdentifier})` : '';
+
         return { 
             success: true, 
-            message: `${type === 'pendencia' ? 'Pendência' : (type === 'defeito' ? 'Defeito' : 'Observação')} registrada com sucesso diretamente na ${docMatch.data().quoteNumber}!`,
+            message: `${type === 'pendencia' ? 'Pendência' : (type === 'defeito' ? 'Defeito' : 'Observação')} registrada com sucesso diretamente na ${docMatch.data().quoteNumber}${unitTag}!`,
             note: newNote,
-            osNumber: docMatch.data().quoteNumber
+            osNumber: docMatch.data().quoteNumber,
+            unitIdentifier: docMatch.data().unitIdentifier
         };
     } catch (e: any) {
         return { error: 'Falha ao registrar nota na OS: ' + e.message };
+    }
+};
+
+export const getBudgetPendingSummaryAdmin = async (companyId: string, budgetCode: string) => {
+    try {
+        const term = (budgetCode || '').trim().toUpperCase();
+        const numberMatch = term.match(/\d+/);
+        const numberPart = numberMatch ? numberMatch[0] : null;
+
+        let snap = await firestore.collection(QUOTES_COLLECTION).where("companyId", "==", companyId).get();
+        const allQuotes = snap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(q => !q.deletedAt);
+
+        // Localiza todas as O.S. / Orçamento correspondentes
+        const matchedOrders = allQuotes.filter(q => {
+            const qNum = (q.quoteNumber || '').toUpperCase();
+            const parentNum = (q.parentQuoteNumber || '').toUpperCase();
+            const parentId = q.parentQuoteId || '';
+
+            const matchesNum = qNum.includes(term) || (numberPart && qNum.includes(numberPart));
+            const matchesParent = parentNum.includes(term) || (numberPart && parentNum.includes(numberPart));
+            const matchesParentId = parentId === term;
+
+            return matchesNum || matchesParent || matchesParentId;
+        });
+
+        if (matchedOrders.length === 0) {
+            return { error: `Nenhum orçamento ou ordem de serviço encontrado para "${budgetCode}".` };
+        }
+
+        const parent = matchedOrders.find(q => !q.isChildOS) || matchedOrders[0];
+        const childOrders = matchedOrders.filter(q => q.isChildOS || q.id !== parent.id);
+
+        const totalOrders = childOrders.length > 0 ? childOrders.length : 1;
+        const targetList = childOrders.length > 0 ? childOrders : [parent];
+
+        const completedOrders = targetList.filter(q => q.status === 'Finalizado');
+        const inProgressOrders = targetList.filter(q => ['Em Execução', 'Atribuída', 'Agendado'].includes(q.status));
+        const pendingOrders = targetList.filter(q => q.status === 'Pendente');
+
+        const unitsDetail = targetList.map(q => {
+            const notesList = (q.osNotes || []).map((n: any) => `[${n.type.toUpperCase()}] ${n.text} (${n.author || 'NORA'})`);
+            if (q.notes) notesList.push(`[RELATÓRIO/NOTAS]: ${q.notes}`);
+
+            return {
+                osNumber: q.quoteNumber.replace('ORC', 'OS'),
+                identificacao: q.unitIdentifier || 'Unidade Principal',
+                status: q.status,
+                tecnico: q.assignedTechnicianName || 'Não atribuído',
+                inicio: q.scheduledDate || 'Não agendado',
+                previsaoTermino: q.expectedEndDate || q.scheduledDate || 'Não definida',
+                observacoesEPendencias: notesList.length > 0 ? notesList : ['Sem observações']
+            };
+        });
+
+        return {
+            orcamentoNumero: parent.quoteNumber,
+            cliente: parent.clientName,
+            totalOS: totalOrders,
+            concluidas: completedOrders.length,
+            emAndamento: inProgressOrders.length,
+            pendentes: pendingOrders.length,
+            unidades: unitsDetail,
+            totalGeral: parent.total,
+            resumo: `Orçamento ${parent.quoteNumber}: ${completedOrders.length} de ${totalOrders} O.S. concluídas (${Math.round((completedOrders.length / totalOrders) * 100)}%). ${inProgressOrders.length + pendingOrders.length} ainda em aberto.`
+        };
+    } catch (e: any) {
+        return { error: 'Falha ao buscar resumo de pendências: ' + e.message };
     }
 };
 

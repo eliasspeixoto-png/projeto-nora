@@ -218,9 +218,10 @@ export default function AdminDashboard() {
         const startOfThisMonth = startOfMonth(now);
 
         const overdueOS = serviceOrders.filter(os => {
-            if (!os || !os.scheduledDate) return false;
+            if (!os || (!os.expectedEndDate && !os.scheduledDate)) return false;
             try {
-                const schedDate = parseISO(`${os.scheduledDate}T23:59:59`);
+                const targetDateStr = os.expectedEndDate || os.scheduledDate;
+                const schedDate = parseISO(`${targetDateStr}T23:59:59`);
                 return isValid(schedDate) && isPast(schedDate) && !['Finalizado', 'rejected'].includes(os.status);
             } catch { return false; }
         }).length;

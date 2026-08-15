@@ -58,17 +58,19 @@ export default function PendingEventsAlerts({ quotes, visits }: { quotes: Quote[
             } catch {}
         });
 
-        // 3. O.S. Atrasadas
+        // 3. O.S. Atrasadas (respeita previsão de término expectedEndDate)
         const serviceOrders = (quotes || []).filter(q => q && ['Pendente', 'Atribuída', 'Em Execução', 'Agendado'].includes(q.status));
         serviceOrders.forEach(os => {
-            if (!os || !os.scheduledDate) return;
+            if (!os || (!os.expectedEndDate && !os.scheduledDate)) return;
             try {
-                const schedDate = parseISO(`${os.scheduledDate}T23:59:59`);
+                const targetDateStr = os.expectedEndDate || os.scheduledDate;
+                const schedDate = parseISO(`${targetDateStr}T23:59:59`);
                 if (isValid(schedDate) && isPast(schedDate) && !['Finalizado', 'rejected'].includes(os.status)) {
+                    const unitSuffix = os.unitIdentifier ? ` (${os.unitIdentifier})` : '';
                     events.push({
                         id: `os-overdue-${os.id}`,
                         type: 'OS_OVERDUE',
-                        title: `O.S. ${os.quoteNumber?.replace('ORC', 'OS') || ''} - Atrasada`,
+                        title: `O.S. ${os.quoteNumber?.replace('ORC', 'OS') || ''}${unitSuffix} - Atrasada`,
                         description: `Cliente: ${os.clientName || 'Desconhecido'}`,
                         date: schedDate,
                         urgency: 'medium',

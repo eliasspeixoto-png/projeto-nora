@@ -799,27 +799,252 @@ export const createReceivable = async (db: Firestore, quoteId: string) => {
     const quote = await getQuote(db, quoteId);
     if (!quote) return;
     
-    // Verifica se já existe um recebível para esta O.S.
+    // Verifica recebíveis existentes para esta O.S.
     const existingQ = query(
         collection(db, ACCOUNTS_RECEIVABLE_COLLECTION), 
         where("companyId", "==", quote.companyId),
         where("quoteId", "==", quoteId)
     );
     const snap = await getDocs(existingQ);
-    if (!snap.empty) return; // Evita duplicidade
+    
+    // Calcula o total já registrado em recebíveis (adiantamentos pagos ou parcelas)
+    let totalAlreadyInReceivables = 0;
+    snap.docs.forEach(d => {
+        const data = d.data() as AccountsReceivable;
+        if (!data.deletedAt) {
+            totalAlreadyInReceivables += (data.originalAmount || data.amount || 0);
+        }
+    });
 
-    await addDoc(collection(db, ACCOUNTS_RECEIVABLE_COLLECTION), {
+    // Se já existem recebíveis que cobrem o total, não duplica
+    if (totalAlreadyInReceivables >= quote.total && !snap.empty) {
+        return;
+    }
+
+    // Calcula o saldo pendente restante (se houve adiantamento)
+    const remainingAmount = Math.max(0, quote.total - totalAlreadyInReceivables);
+    if (remainingAmount <= 0) return;
+
+    await addDoc(collection(db, ACCOUNTS_RECEIVABLE_COLLECTION), sanitizeData({
         companyId: quote.companyId,
         quoteId: quote.id,
         quoteNumber: quote.quoteNumber,
         clientId: quote.clientId,
         clientName: quote.clientName,
-        amount: quote.total,
-        originalAmount: quote.total,
+        amount: remainingAmount,
+        originalAmount: remainingAmount,
         status: 'Pendente',
-        dueDate: format(addDays(getBrasiliaDate(), 30), 'yyyy-MM-dd'),
+        dueDate: quote.expectedEndDate || format(addDays(getBrasiliaDate(), 30), 'yyyy-MM-dd'),
         creationDate: getBrasiliaDate().toISOString(),
+        parentQuoteNumber: quote.parentQuoteNumber || quote.quoteNumber,
+        unitIdentifier: quote.unitIdentifier || '',
+        notes: totalAlreadyInReceivables > 0 ? `Saldo restante da O.S. (Adiantamento prévio: R$ ${totalAlreadyInReceivables.toFixed(2)})` : ''
+    }));
+};
+
+export const registerOSAdvancePayment = async (
+    db: Firestore, 
+    auth: Auth, 
+    osId: string, 
+    data: { 
+        amount: number; 
+        date: string; 
+        method: string; 
+        notes?: string; 
+        generateRemainingReceivable?: boolean; 
+        remainingDueDate?: string; 
+    }
+) => {
+    const quote = await getQuote(db, osId);
+    if (!quote) throw new Error("Ordem de Serviço não encontrada.");
+
+    const advanceId = `adv_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const now = getBrasiliaDate();
+    const paymentDateISO = data.date ? `${data.date}T${format(now, 'HH:mm:ss')}` : now.toISOString();
+
+    const newAdvance = {
+        id: advanceId,
+        amount: data.amount,
+        date: data.date || format(now, 'yyyy-MM-dd'),
+        method: data.method || 'PIX',
+        notes: data.notes || '',
+        registeredBy: auth.currentUser?.displayName || 'Administrador'
+    };
+
+    // 1. Cria o recebível com status Pago no Financeiro
+    const receivableDocRef = await addDoc(collection(db, ACCOUNTS_RECEIVABLE_COLLECTION), sanitizeData({
+        companyId: quote.companyId,
+        quoteId: quote.id,
+        quoteNumber: `${quote.quoteNumber.replace('ORC', 'OS')} (Adiantamento)`,
+        clientId: quote.clientId,
+        clientName: quote.clientName,
+        amount: 0,
+        originalAmount: data.amount,
+        finalAmount: data.amount,
+        status: 'Pago',
+        dueDate: data.date || format(now, 'yyyy-MM-dd'),
+        paymentDate: paymentDateISO,
+        method: data.method || 'PIX',
+        isAdvancePayment: true,
+        parentQuoteNumber: quote.parentQuoteNumber || quote.quoteNumber,
+        unitIdentifier: quote.unitIdentifier || '',
+        notes: data.notes || 'Adiantamento registrado',
+        paymentHistory: [{
+            amount: data.amount,
+            date: paymentDateISO,
+            method: data.method || 'PIX'
+        }],
+        creationDate: now.toISOString()
+    }));
+
+    (newAdvance as any).receivableId = receivableDocRef.id;
+
+    // 2. Atualiza a O.S. com o adiantamento
+    const existingAdvances = quote.advancePayments || [];
+    const updatedAdvances = [...existingAdvances, newAdvance];
+
+    const osUpdate: Partial<Quote> = {
+        advancePayments: updatedAdvances,
+        statusHistory: [
+            ...(quote.statusHistory || []),
+            {
+                status: quote.status,
+                changedAt: now.toISOString(),
+                changedBy: auth.currentUser?.uid,
+                notes: `Adiantamento financeiro de R$ ${data.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} registrado via ${data.method || 'PIX'}.`
+            }
+        ]
+    };
+
+    // 3. Se solicitado, gera a parcela do saldo restante pendente
+    const totalAdvances = updatedAdvances.reduce((sum, a) => sum + a.amount, 0);
+    const remainingBalance = Math.max(0, quote.total - totalAdvances);
+
+    if (data.generateRemainingReceivable && remainingBalance > 0) {
+        await addDoc(collection(db, ACCOUNTS_RECEIVABLE_COLLECTION), sanitizeData({
+            companyId: quote.companyId,
+            quoteId: quote.id,
+            quoteNumber: `${quote.quoteNumber.replace('ORC', 'OS')} (Saldo Restante)`,
+            clientId: quote.clientId,
+            clientName: quote.clientName,
+            amount: remainingBalance,
+            originalAmount: remainingBalance,
+            status: 'Pendente',
+            dueDate: data.remainingDueDate || quote.expectedEndDate || format(addDays(now, 30), 'yyyy-MM-dd'),
+            creationDate: now.toISOString(),
+            parentQuoteNumber: quote.parentQuoteNumber || quote.quoteNumber,
+            unitIdentifier: quote.unitIdentifier || '',
+            notes: `Saldo a receber após adiantamento de R$ ${totalAdvances.toFixed(2)}`
+        }));
+    }
+
+    await setDoc(doc(db, QUOTES_COLLECTION, osId), sanitizeData(osUpdate), { merge: true });
+    return { success: true, advance: newAdvance, remainingBalance };
+};
+
+export const splitQuoteIntoChildOrders = async (
+    db: Firestore, 
+    auth: Auth, 
+    parentQuoteId: string, 
+    count: number, 
+    childOSList: { 
+        unitIdentifier: string; 
+        scheduledDate?: string; 
+        scheduledTime?: string;
+        expectedEndDate?: string; 
+        expectedEndTime?: string;
+        assignedTechnicianId?: string; 
+        assignedTechnicianName?: string; 
+        notes?: string; 
+    }[]
+) => {
+    const parentQuote = await getQuote(db, parentQuoteId);
+    if (!parentQuote) throw new Error("Orçamento de origem não encontrado.");
+    if (count <= 0) throw new Error("A quantidade de O.S. filhas deve ser maior que zero.");
+
+    const batch = writeBatch(db);
+    const now = getBrasiliaDate();
+    const cleanParentNumber = parentQuote.quoteNumber.replace('ORC', 'OS');
+    const createdIds: string[] = [];
+
+    // Divisão proporcional exata de itens
+    const itemsPerChild = (parentQuote.items || []).map(item => {
+        const dividedQty = item.quantity / count;
+        const roundedQty = Number.isInteger(dividedQty) ? dividedQty : parseFloat(dividedQty.toFixed(2));
+        const itemMatPrice = item.materialPrice || 0;
+        const itemServPrice = item.servicePrice || 0;
+        const itemTotal = (itemMatPrice + itemServPrice) * roundedQty;
+
+        return {
+            ...item,
+            id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            quantity: roundedQty,
+            total: itemTotal
+        };
     });
+
+    const childTotal = parseFloat((parentQuote.total / count).toFixed(2));
+    const childDiscount = parseFloat(((parentQuote.discount || 0) / count).toFixed(2));
+
+    for (let index = 0; index < count; index++) {
+        const childData = childOSList[index] || { unitIdentifier: `Unidade ${index + 1}` };
+        const childNumber = `${cleanParentNumber}-${String(index + 1).padStart(2, '0')}`;
+        const newChildRef = doc(collection(db, QUOTES_COLLECTION));
+
+        const initialStatus = childData.assignedTechnicianId ? 'Atribuída' : (childData.scheduledDate ? 'Agendado' : 'Pendente');
+
+        const newChildOS: any = {
+            companyId: parentQuote.companyId,
+            clientId: parentQuote.clientId,
+            clientName: parentQuote.clientName,
+            companyName: parentQuote.companyName || '',
+            date: now.toISOString(),
+            quoteNumber: childNumber,
+            parentQuoteId: parentQuote.id,
+            parentQuoteNumber: parentQuote.quoteNumber,
+            unitIdentifier: childData.unitIdentifier || `Unidade ${index + 1}`,
+            isChildOS: true,
+            childOSIndex: index + 1,
+            childOSCount: count,
+            status: initialStatus,
+            items: itemsPerChild,
+            total: childTotal,
+            discount: childDiscount,
+            serviceType: parentQuote.serviceType || 'Geral',
+            osType: parentQuote.osType || 'Serviço Avulso',
+            creatorName: auth.currentUser?.displayName || parentQuote.creatorName || 'Sistema',
+            scheduledDate: childData.scheduledDate || parentQuote.scheduledDate || '',
+            scheduledTime: childData.scheduledTime || parentQuote.scheduledTime || '09:00',
+            expectedEndDate: childData.expectedEndDate || parentQuote.expectedEndDate || '',
+            expectedEndTime: childData.expectedEndTime || parentQuote.expectedEndTime || '18:00',
+            assignedTechnicianId: childData.assignedTechnicianId || parentQuote.assignedTechnicianId || '',
+            assignedTechnicianName: childData.assignedTechnicianName || parentQuote.assignedTechnicianName || '',
+            assignedAt: childData.assignedTechnicianId ? now.toISOString() : null,
+            notes: childData.notes || parentQuote.notes || '',
+            statusHistory: [
+                {
+                    status: initialStatus,
+                    changedAt: now.toISOString(),
+                    changedBy: auth.currentUser?.uid,
+                    notes: `O.S. Fracionada (${index + 1}/${count}) gerada do orçamento ${parentQuote.quoteNumber} - Identificação: ${childData.unitIdentifier}`
+                }
+            ]
+        };
+
+        batch.set(newChildRef, sanitizeData(newChildOS));
+        createdIds.push(newChildRef.id);
+    }
+
+    // Atualiza o orçamento pai marcando que foi fracionado
+    const parentRef = doc(db, QUOTES_COLLECTION, parentQuoteId);
+    batch.update(parentRef, {
+        status: 'Aprovado',
+        childOSCount: count,
+        notes: `${parentQuote.notes || ''}\n[FRACIONAMENTO]: Desmembrado em ${count} O.S. filhas em ${now.toLocaleDateString('pt-BR')}.`.trim()
+    });
+
+    await batch.commit();
+    return { success: true, count, createdIds };
 };
 
 export const processPartialPayment = async (db: Firestore, id: string, data: any) => {

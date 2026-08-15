@@ -8,14 +8,16 @@ import { deleteQuote, updateQuote, getOSReturns, getQuotes, getClients } from '@
 import type { Quote, UserProfile, OSReturn, Client } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, PlusCircle, User, MapPin, Search, HardHat, Eye, Edit, Trash2, Calendar, Check, AlertTriangle, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, PlusCircle, User, MapPin, Search, HardHat, Eye, Edit, Trash2, Calendar, Check, AlertTriangle, MoreHorizontal, ChevronLeft, ChevronRight, DollarSign, Layers, Tag, CalendarRange, Truck, Building } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import ScheduleServiceDialog from "@/components/orcamentos/schedule-dialog";
+import ScheduleServiceDialog from "@/components/ordem-de-servico/schedule-dialog";
+import SplitOsDialog from "@/components/ordem-de-servico/split-os-dialog";
+import AdvancePaymentDialog from "@/components/ordem-de-servico/advance-payment-dialog";
 import { osStatusConfig } from '@/components/ordem-de-servico/os-status-config';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -64,6 +66,12 @@ export default function OrdemDeServicoPage() {
     const [viewingOS, setViewingOS] = useState<Quote | null>(null);
     const [osToDelete, setOsToDelete] = useState<string | null>(null);
     const [isScheduleOpen, setScheduleOpen] = useState(false);
+
+    // Modais de Split e Adiantamento
+    const [isSplitOpen, setSplitOpen] = useState(false);
+    const [osToSplit, setOsToSplit] = useState<Quote | null>(null);
+    const [isAdvanceOpen, setAdvanceOpen] = useState(false);
+    const [osForAdvance, setOsForAdvance] = useState<Quote | null>(null);
 
     // Helper to resolve technician names from teamMembers
     const getTechName = (uidOrName?: string) => {
@@ -244,18 +252,37 @@ export default function OrdemDeServicoPage() {
         setScheduleOpen(true);
     };
 
-    const handleConfirmSchedule = async (data: { date: string, time: string, notes?: string, technicianId?: string }) => {
+    const handleSplitOS = (os: Quote) => {
+        setOsToSplit(os);
+        setSplitOpen(true);
+    };
+
+    const handleOpenAdvance = (os: Quote) => {
+        setOsForAdvance(os);
+        setAdvanceOpen(true);
+    };
+
+    const handleConfirmSchedule = async (data: {
+        date: string;
+        time: string;
+        expectedEndDate?: string;
+        expectedEndTime?: string;
+        unitIdentifier?: string;
+        notes?: string;
+        technicianId?: string;
+    }) => {
         if (!osToSchedule || !firebase.db || !firebase.auth) return;
 
         try {
             const tech = teamMembers.find(t => t.uid === data.technicianId);
-            const osStatusToFetch: Quote['status'][] = ['Pendente', 'Atribuída', 'Em Execução', 'Agendado', 'revision-pending', 'Devolvida', 'Atrasada'];
             const newStatus = data.technicianId ? 'Atribuída' : 'Agendado';
             
-            await updateQuote(firebase.db, firebase.auth, osToSchedule.id, {
+            const updatePayload: any = {
                 status: newStatus as Quote['status'],
                 scheduledDate: data.date,
                 scheduledTime: data.time,
+                executionStartDate: data.date,
+                executionStartTime: data.time,
                 schedulingNotes: data.notes,
                 assignedTechnicianId: data.technicianId || '',
                 assignedTechnicianName: tech?.displayName || 'Não atribuído',
@@ -271,7 +298,17 @@ export default function OrdemDeServicoPage() {
                             : `O.S. Agendada para ${formatDate(data.date)} às ${data.time}`
                     }
                 ]
-            });
+            };
+
+            if (data.expectedEndDate) {
+                updatePayload.expectedEndDate = data.expectedEndDate;
+                updatePayload.expectedEndTime = data.expectedEndTime || '18:00';
+            }
+            if (data.unitIdentifier) {
+                updatePayload.unitIdentifier = data.unitIdentifier;
+            }
+
+            await updateQuote(firebase.db, firebase.auth, osToSchedule.id, updatePayload);
             toast({ title: 'O.S. Atualizada!', description: data.technicianId ? 'Técnico atribuído com sucesso.' : 'Serviço agendado.' });
             setScheduleOpen(false);
 
@@ -413,49 +450,77 @@ export default function OrdemDeServicoPage() {
                             <div className="flex flex-col gap-6">
                                 {/* Mobile View */}
                                 <div className="grid gap-4 md:hidden w-full min-w-0 pb-10">
-                                    {paginatedOS.length > 0 ? paginatedOS.map(os => (
+                                    {paginatedOS.length > 0 ? paginatedOS.map(os => {
+                                        const advancesTotal = (os.advancePayments || []).reduce((sum, a) => sum + a.amount, 0);
+                                        return (
                                         <Card key={os.id} className="w-full min-w-0 border-none bg-background/40 backdrop-blur-3xl rounded-xl shadow-premium overflow-hidden transition-all duration-300 active:scale-[0.98]" onClick={() => setViewingOS(os)}>
-                                            <CardContent className="p-6 space-y-4 min-w-0">
+                                            <CardContent className="p-5 space-y-3.5 min-w-0">
                                                 <div className="flex justify-between items-start gap-2 min-w-0">
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="font-semibold text-xs text-primary/60 uppercase tracking-widest truncate">{os.quoteNumber.replace('ORC', 'OS')}</p>
-                                                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{formatDate(os.scheduledDate)} {os.scheduledTime}</p>
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <p className="font-semibold text-xs text-primary/80 uppercase tracking-widest truncate">{os.quoteNumber.replace('ORC', 'OS')}</p>
+                                                            {os.unitIdentifier && (
+                                                                <Badge variant="outline" className="h-5 px-2 font-bold text-[9px] bg-primary/10 text-primary border-primary/20">
+                                                                    <Tag className="h-2.5 w-2.5 mr-1" /> {os.unitIdentifier}
+                                                                </Badge>
+                                                            )}
+                                                            {os.isChildOS && (
+                                                                <Badge variant="secondary" className="h-5 px-2 text-[9px] font-semibold opacity-70">
+                                                                    {os.childOSIndex}/{os.childOSCount}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">
+                                                            Início: {formatDate(os.scheduledDate)} {os.scheduledTime}
+                                                            {os.expectedEndDate && ` • Término: ${formatDate(os.expectedEndDate)}`}
+                                                        </p>
                                                     </div>
                                                     <Badge variant={osStatusConfig[os.status]?.variant || 'default'} className="h-6 px-3 rounded-full font-semibold text-[9px] uppercase tracking-widest shrink-0">
                                                         {osStatusConfig[os.status]?.label || os.status}
                                                     </Badge>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <p className="font-semibold text-lg tracking-tight truncate break-words text-foreground/90 uppercase">{os.clientName}</p>
+                                                    <p className="font-semibold text-base tracking-tight truncate break-words text-foreground/90 uppercase">{os.clientName}</p>
                                                     <p className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider flex items-center gap-1.5">
                                                         <User className="h-3 w-3" /> {os.assignedTechnicianName || 'Não atribuído'}
                                                     </p>
                                                 </div>
-                                                <div className="flex justify-between items-center mt-2 pt-4 border-t border-border/40 gap-2">
-                                                    <p className="font-semibold text-blue-600 text-xl tracking-tighter shrink-0">{formatCurrency(os.total)}</p>
+                                                <div className="flex justify-between items-center mt-2 pt-3 border-t border-border/40 gap-2">
+                                                    <div>
+                                                        <p className="font-semibold text-blue-600 text-lg tracking-tighter shrink-0">{formatCurrency(os.total)}</p>
+                                                        {advancesTotal > 0 && (
+                                                            <p className="text-[10px] font-bold text-green-600">
+                                                                {formatCurrency(advancesTotal)} adiantados
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                     <div className="flex gap-2 shrink-0">
-                                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-primary/5 text-primary" onClick={(e) => { e.stopPropagation(); setViewingOS(os) }}><Eye className="h-5 w-5"/></Button>
+                                                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl bg-primary/5 text-primary" onClick={(e) => { e.stopPropagation(); setViewingOS(os) }}><Eye className="h-4 w-4"/></Button>
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" className="h-10 w-10 rounded-xl bg-muted/50 p-0" onClick={(e) => e.stopPropagation()}>
+                                                                <Button variant="ghost" className="h-9 w-9 rounded-xl bg-muted/50 p-0" onClick={(e) => e.stopPropagation()}>
                                                                     <MoreHorizontal className="h-4 w-4" />
                                                                 </Button>
                                                             </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" className="p-2 rounded-2xl bg-background/80 backdrop-blur-3xl border-border/40 shadow-premium">
-                                                                <DropdownMenuItem className="h-10 rounded-xl font-semibold cursor-pointer" onClick={() => handleSchedule(os)}><Calendar className="mr-2 h-4 w-4" />Agendar/Atribuir</DropdownMenuItem>
-                                                                {os.status === 'revision-pending' && (
-                                                                    <DropdownMenuItem className="h-10 rounded-xl font-semibold text-green-600 cursor-pointer" onClick={() => handleConfirmRevision(os.id)}><Check className="mr-2 h-4 w-4" />Confirmar Revisão</DropdownMenuItem>
+                                                            <DropdownMenuContent align="end" className="p-2 rounded-2xl bg-background/95 backdrop-blur-3xl border-border/40 shadow-premium z-50">
+                                                                <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => handleSchedule(os)}><CalendarRange className="mr-2 h-3.5 w-3.5" />Cronograma / Atribuir</DropdownMenuItem>
+                                                                <DropdownMenuItem className="h-9 rounded-xl font-semibold text-green-600 cursor-pointer text-xs" onClick={() => handleOpenAdvance(os)}><DollarSign className="mr-2 h-3.5 w-3.5" />Lançar Adiantamento</DropdownMenuItem>
+                                                                {!os.isChildOS && (
+                                                                    <DropdownMenuItem className="h-9 rounded-xl font-semibold text-blue-600 cursor-pointer text-xs" onClick={() => handleSplitOS(os)}><Layers className="mr-2 h-3.5 w-3.5" />Fatiar em Múltiplas O.S.</DropdownMenuItem>
                                                                 )}
-                                                                <DropdownMenuItem className="h-10 rounded-xl font-semibold cursor-pointer" onClick={() => router.push(`/ordem-de-servico/executar/${os.id}`)}><Edit className="mr-2 h-4 w-4" />Executar</DropdownMenuItem>
+                                                                {os.status === 'revision-pending' && (
+                                                                    <DropdownMenuItem className="h-9 rounded-xl font-semibold text-green-600 cursor-pointer text-xs" onClick={() => handleConfirmRevision(os.id)}><Check className="mr-2 h-3.5 w-3.5" />Confirmar Revisão</DropdownMenuItem>
+                                                                )}
+                                                                <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => router.push(`/ordem-de-servico/executar/${os.id}`)}><Edit className="mr-2 h-3.5 w-3.5" />Executar</DropdownMenuItem>
                                                                 <DropdownMenuSeparator className="bg-primary/5" />
-                                                                <DropdownMenuItem className="h-10 rounded-xl font-semibold text-destructive cursor-pointer" onClick={() => confirmDelete(os.id)}><Trash2 className="mr-2 h-4 w-4" />Excluir</DropdownMenuItem>
+                                                                <DropdownMenuItem className="h-9 rounded-xl font-semibold text-destructive cursor-pointer text-xs" onClick={() => confirmDelete(os.id)}><Trash2 className="mr-2 h-3.5 w-3.5" />Excluir</DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </div>
                                                 </div>
                                             </CardContent>
                                         </Card>
-                                    )) : (
+                                    )}) : (
                                         <div className="h-40 flex items-center justify-center rounded-xl border-2 border-dashed border-border/40 text-muted-foreground font-semibold uppercase tracking-widest text-xs">Nenhuma O.S. encontrada.</div>
                                     )}
                                 </div>
@@ -467,27 +532,66 @@ export default function OrdemDeServicoPage() {
                                             <TableHeader className="bg-primary/5 border-none h-[34px]">
                                                 <TableRow className="hover:bg-transparent border-none h-[34px]">
                                                     <TableHead className="px-6 h-[34px] font-semibold uppercase tracking-widest text-[10px] opacity-40 text-foreground">Nº O.S.</TableHead>
+                                                    <TableHead className="px-6 h-[34px] font-semibold uppercase tracking-widest text-[10px] opacity-40 text-foreground">Identificação / Unidade</TableHead>
                                                     <TableHead className="px-6 h-[34px] font-semibold uppercase tracking-widest text-[10px] opacity-40 text-foreground">Cliente</TableHead>
-                                                    <TableHead className="px-6 h-[34px] font-semibold uppercase tracking-widest text-[10px] opacity-40 text-foreground">Data Agendada</TableHead>
+                                                    <TableHead className="px-6 h-[34px] font-semibold uppercase tracking-widest text-[10px] opacity-40 text-foreground">Início / Término</TableHead>
                                                     <TableHead className="px-6 h-[34px] font-semibold uppercase tracking-widest text-[10px] opacity-40 text-foreground">Técnico</TableHead>
                                                     <TableHead className="px-6 h-[34px] font-semibold uppercase tracking-widest text-[10px] opacity-40 text-foreground">Status</TableHead>
-                                                    <TableHead className="text-right px-6 h-[34px] font-semibold uppercase tracking-widest text-[10px] opacity-40 text-foreground">Valor</TableHead>
+                                                    <TableHead className="text-right px-6 h-[34px] font-semibold uppercase tracking-widest text-[10px] opacity-40 text-foreground">Valor / Saldo</TableHead>
                                                     <TableHead className="w-20 px-6 h-[34px]"></TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody className="border-none">
-                                                {paginatedOS.map((os) => (
+                                                {paginatedOS.map((os) => {
+                                                    const advancesTotal = (os.advancePayments || []).reduce((sum, a) => sum + a.amount, 0);
+                                                    return (
                                                     <TableRow 
                                                         key={os.id} 
-                                                        className="group dark: transition-all duration-500 border-border/40 cursor-pointer h-[34px] hover:bg-primary/10 even:bg-blue-50 dark:even:bg-blue-900/30"
+                                                        className="group dark: transition-all duration-500 border-border/40 cursor-pointer h-[38px] hover:bg-primary/10 even:bg-blue-50/50 dark:even:bg-blue-900/20"
                                                         onClick={() => setViewingOS(os)}
                                                     >
-                                                        <TableCell className="py-0 font-semibold text-xs px-6 truncate text-foreground">{os.quoteNumber.replace('ORC', 'OS')}</TableCell>
-                                                        <TableCell className="py-0 text-xs font-semibold px-6 truncate max-w-[200px] opacity-80 text-foreground uppercase">{os.clientName}</TableCell>
-                                                        <TableCell className="py-0 text-xs font-semibold px-6 opacity-60 group-hover:opacity-100 transition-all text-foreground">{formatDate(os.scheduledDate)} {os.scheduledTime}</TableCell>
-                                                        <TableCell className="py-0 text-xs font-semibold px-6 opacity-60 group-hover:opacity-100 transition-all text-foreground">{os.assignedTechnicianName || 'Não atribuído'}</TableCell>
+                                                        <TableCell className="py-0 font-semibold text-xs px-6 truncate text-foreground">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span>{os.quoteNumber.replace('ORC', 'OS')}</span>
+                                                                {os.isChildOS && (
+                                                                    <Badge variant="secondary" className="h-4 px-1.5 text-[8px] font-bold opacity-70">
+                                                                        {os.childOSIndex}/{os.childOSCount}
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="py-0 text-xs px-6 truncate max-w-[150px]">
+                                                            {os.unitIdentifier ? (
+                                                                <Badge variant="outline" className="h-5 px-2 text-[10px] font-bold bg-primary/5 text-primary border-primary/20 flex items-center gap-1 w-fit">
+                                                                    <Tag className="h-2.5 w-2.5" /> {os.unitIdentifier}
+                                                                </Badge>
+                                                            ) : (
+                                                                <span className="opacity-40 text-[11px]">—</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="py-0 text-xs font-semibold px-6 truncate max-w-[180px] opacity-80 text-foreground uppercase">{os.clientName}</TableCell>
+                                                        <TableCell className="py-0 text-xs font-medium px-6 text-foreground">
+                                                            <div className="flex flex-col text-[11px] leading-tight">
+                                                                <span className="font-semibold text-foreground/90">{formatDate(os.scheduledDate)} {os.scheduledTime}</span>
+                                                                {os.expectedEndDate && (
+                                                                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                                                                        Até: {formatDate(os.expectedEndDate)}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="py-0 text-xs font-semibold px-6 opacity-70 group-hover:opacity-100 transition-all text-foreground">{os.assignedTechnicianName || 'Não atribuído'}</TableCell>
                                                         <TableCell className="py-0 px-6"><Badge className="h-5 px-3 rounded-full font-semibold text-[9px] uppercase tracking-widest shadow-lg shadow-black/5 transition-all group-hover:scale-105" variant={osStatusConfig[os.status]?.variant || 'default'}>{osStatusConfig[os.status]?.label || os.status}</Badge></TableCell>
-                                                        <TableCell className="py-0 text-right font-semibold text-blue-600 text-xs tracking-tighter px-6 group-hover:scale-105 transition-all duration-500 origin-right">{formatCurrency(os.total)}</TableCell>
+                                                        <TableCell className="py-0 text-right font-semibold text-xs tracking-tighter px-6">
+                                                            <div className="flex flex-col items-end">
+                                                                <span className="text-blue-600">{formatCurrency(os.total)}</span>
+                                                                {advancesTotal > 0 && (
+                                                                    <span className="text-[9px] font-bold text-green-600">
+                                                                        Adiantado: {formatCurrency(advancesTotal)}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
                                                         <TableCell className="py-0 px-6 text-right" onClick={(e) => e.stopPropagation()}>
                                                             <DropdownMenu>
                                                                 <DropdownMenuTrigger asChild>
@@ -495,20 +599,24 @@ export default function OrdemDeServicoPage() {
                                                                         <MoreHorizontal className="h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity" />
                                                                     </Button>
                                                                 </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end" className="p-2 rounded-2xl bg-background/80 backdrop-blur-3xl border-border/40 shadow-premium">
-                                                                    <DropdownMenuItem className="h-10 rounded-xl font-semibold cursor-pointer" onClick={() => setViewingOS(os)}><Eye className="mr-2 h-4 w-4" />Visualizar</DropdownMenuItem>
-                                                                    <DropdownMenuItem className="h-10 rounded-xl font-semibold cursor-pointer" onClick={() => handleSchedule(os)}><Calendar className="mr-2 h-4 w-4" />Agendar/Atribuir</DropdownMenuItem>
-                                                                    {os.status === 'revision-pending' && (
-                                                                        <DropdownMenuItem className="h-10 rounded-xl font-semibold text-green-600 cursor-pointer" onClick={() => handleConfirmRevision(os.id)}><Check className="mr-2 h-4 w-4" />Confirmar Revisão</DropdownMenuItem>
+                                                                <DropdownMenuContent align="end" className="p-2 rounded-2xl bg-background/95 backdrop-blur-3xl border-border/40 shadow-premium z-50">
+                                                                    <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => setViewingOS(os)}><Eye className="mr-2 h-3.5 w-3.5" />Visualizar</DropdownMenuItem>
+                                                                    <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => handleSchedule(os)}><CalendarRange className="mr-2 h-3.5 w-3.5" />Cronograma / Atribuir</DropdownMenuItem>
+                                                                    <DropdownMenuItem className="h-9 rounded-xl font-semibold text-green-600 cursor-pointer text-xs" onClick={() => handleOpenAdvance(os)}><DollarSign className="mr-2 h-3.5 w-3.5" />Lançar Adiantamento</DropdownMenuItem>
+                                                                    {!os.isChildOS && (
+                                                                        <DropdownMenuItem className="h-9 rounded-xl font-semibold text-blue-600 cursor-pointer text-xs" onClick={() => handleSplitOS(os)}><Layers className="mr-2 h-3.5 w-3.5" />Fatiar em Múltiplas O.S.</DropdownMenuItem>
                                                                     )}
-                                                                    <DropdownMenuItem className="h-10 rounded-xl font-semibold cursor-pointer" onClick={() => router.push(`/ordem-de-servico/executar/${os.id}`)}><Edit className="mr-2 h-4 w-4" />Executar</DropdownMenuItem>
+                                                                    {os.status === 'revision-pending' && (
+                                                                        <DropdownMenuItem className="h-9 rounded-xl font-semibold text-green-600 cursor-pointer text-xs" onClick={() => handleConfirmRevision(os.id)}><Check className="mr-2 h-3.5 w-3.5" />Confirmar Revisão</DropdownMenuItem>
+                                                                    )}
+                                                                    <DropdownMenuItem className="h-9 rounded-xl font-semibold cursor-pointer text-xs" onClick={() => router.push(`/ordem-de-servico/executar/${os.id}`)}><Edit className="mr-2 h-3.5 w-3.5" />Executar</DropdownMenuItem>
                                                                     <DropdownMenuSeparator className="bg-primary/5" />
-                                                                    <DropdownMenuItem className="h-10 rounded-xl font-semibold text-destructive cursor-pointer" onClick={() => confirmDelete(os.id)}><Trash2 className="mr-2 h-4 w-4" />Excluir</DropdownMenuItem>
+                                                                    <DropdownMenuItem className="h-9 rounded-xl font-semibold text-destructive cursor-pointer text-xs" onClick={() => confirmDelete(os.id)}><Trash2 className="mr-2 h-3.5 w-3.5" />Excluir</DropdownMenuItem>
                                                                 </DropdownMenuContent>
                                                             </DropdownMenu>
                                                         </TableCell>
                                                     </TableRow>
-                                                ))}
+                                                )})}
                                             </TableBody>
                                         </Table>
                                     </div>
@@ -690,17 +798,76 @@ export default function OrdemDeServicoPage() {
                         return viewingOS && (
                             <div className="flex flex-col max-h-[75vh]">
                                 <div className="p-8 pt-4 space-y-6 overflow-y-auto custom-scrollbar">
-                                    {/* Resumo Premium */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-5 rounded-xl bg-primary/5 border border-border/40">
-                                            <Label className="text-[9px] font-semibold uppercase tracking-widest text-primary/60">Cliente</Label>
-                                            <p className="font-semibold text-lg tracking-tight truncate">{viewingOS.clientName}</p>
+                                    {/* Resumo Financeiro & Cronograma */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="p-4 rounded-xl bg-primary/5 border border-border/40 space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <Label className="text-[9px] font-semibold uppercase tracking-widest text-primary/60">Cliente & Unidade</Label>
+                                                {viewingOS.unitIdentifier && (
+                                                    <Badge variant="outline" className="text-[9px] font-bold bg-primary/10 text-primary border-primary/20">
+                                                        <Tag className="h-2.5 w-2.5 mr-1" /> {viewingOS.unitIdentifier}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            <p className="font-bold text-base tracking-tight truncate">{viewingOS.clientName}</p>
+                                            <p className="text-[10px] text-muted-foreground font-semibold">
+                                                Início: {formatDate(viewingOS.scheduledDate)} {viewingOS.scheduledTime || '09:00'}
+                                                {viewingOS.expectedEndDate && ` • Previsão: ${formatDate(viewingOS.expectedEndDate)}`}
+                                            </p>
                                         </div>
-                                        <div className="p-5 rounded-xl bg-blue-500/5 border border-blue-500/5">
-                                            <Label className="text-[9px] font-semibold uppercase tracking-widest text-blue-600/60">Total</Label>
-                                            <p className="font-semibold text-lg tracking-tight text-blue-600">{formatCurrency(viewingOS.total)}</p>
+
+                                        <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/10 space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <Label className="text-[9px] font-semibold uppercase tracking-widest text-blue-600/60">Financeiro da O.S.</Label>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-5 px-2 text-[9px] font-bold text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30"
+                                                    onClick={() => {
+                                                        const currentOs = viewingOS;
+                                                        setViewingOS(null);
+                                                        handleOpenAdvance(currentOs);
+                                                    }}
+                                                >
+                                                    <DollarSign className="h-3 w-3 mr-0.5" /> + Adiantamento
+                                                </Button>
+                                            </div>
+                                            <div className="flex justify-between items-baseline">
+                                                <p className="font-bold text-base tracking-tight text-blue-600">{formatCurrency(viewingOS.total)}</p>
+                                                {(() => {
+                                                    const advTotal = (viewingOS.advancePayments || []).reduce((sum, a) => sum + a.amount, 0);
+                                                    const remaining = Math.max(0, viewingOS.total - advTotal);
+                                                    return advTotal > 0 ? (
+                                                        <span className="text-[10px] font-bold text-green-600">
+                                                            {formatCurrency(advTotal)} pago • Saldo: {formatCurrency(remaining)}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] font-semibold text-muted-foreground">Sem adiantamentos</span>
+                                                    );
+                                                })()}
+                                            </div>
                                         </div>
                                     </div>
+
+                                    {/* Lista de Adiantamentos se houver */}
+                                    {viewingOS.advancePayments && viewingOS.advancePayments.length > 0 && (
+                                        <div className="p-3.5 rounded-xl bg-green-50/40 dark:bg-green-950/20 border border-green-200/50 dark:border-green-800/30 space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase tracking-wider text-green-700 dark:text-green-400 flex items-center gap-1.5">
+                                                <DollarSign className="h-3.5 w-3.5" /> Adiantamentos Realizados ({viewingOS.advancePayments.length})
+                                            </Label>
+                                            <div className="space-y-1.5">
+                                                {viewingOS.advancePayments.map((adv, idx) => (
+                                                    <div key={idx} className="flex justify-between items-center text-xs p-2 rounded-lg bg-background/80 border border-border/40">
+                                                        <div className="space-y-0.5">
+                                                            <span className="font-bold text-green-600">{formatCurrency(adv.amount)}</span>
+                                                            <span className="text-[10px] text-muted-foreground ml-2">via {adv.method} em {formatDate(adv.date)}</span>
+                                                        </div>
+                                                        {adv.notes && <span className="text-[10px] italic text-muted-foreground truncate max-w-[150px]">{adv.notes}</span>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Linha do Tempo (Atividades) */}
                                     <div className="space-y-4">
@@ -782,6 +949,24 @@ export default function OrdemDeServicoPage() {
                     quoteNumber={osToSchedule.quoteNumber.replace('ORC', 'OS')}
                     teamMembers={teamMembers}
                     currentTechnicianId={osToSchedule.assignedTechnicianId}
+                    currentOS={osToSchedule}
+                />
+            )}
+
+            {osToSplit && (
+                <SplitOsDialog
+                    isOpen={isSplitOpen}
+                    setOpen={setSplitOpen}
+                    quote={osToSplit}
+                    teamMembers={teamMembers}
+                />
+            )}
+
+            {osForAdvance && (
+                <AdvancePaymentDialog
+                    isOpen={isAdvanceOpen}
+                    setOpen={setAdvanceOpen}
+                    quote={osForAdvance}
                 />
             )}
         </>

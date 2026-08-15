@@ -313,9 +313,14 @@ export type Quote = {
   comodatoMonthlyFee?: number;
   statusHistory?: StatusHistory[];
 
-  // Schedule fields
+  // Schedule & Execution fields
   scheduledDate?: string; // YYYY-MM-DD
   scheduledTime?: string; // HH:mm
+  executionStartDate?: string; // YYYY-MM-DD
+  executionStartTime?: string; // HH:mm
+  expectedEndDate?: string; // YYYY-MM-DD
+  expectedEndTime?: string; // HH:mm
+  executionProgress?: string; // Ex: "6 de 16 caminhões instalados"
   scheduleStatus?: 'pending-client-approval' | 'confirmed' | 'reschedule-requested';
   schedulingNotes?: string;
   approvalDate?: string; // ISO String
@@ -326,6 +331,25 @@ export type Quote = {
     newTime: string;
     reason: string;
     timestamp: string; // ISO
+  }[];
+
+  // Batch / Child Service Orders (Sub-OS Fracionadas)
+  parentQuoteId?: string; // ID do orçamento mestre
+  parentQuoteNumber?: string; // Ex: "0145/26" ou "ORC 0145/26"
+  unitIdentifier?: string; // Placa, TAG, Chassi, Apto, Bloco, etc.
+  isChildOS?: boolean;
+  childOSIndex?: number; // Ex: 1, 2, ..., 16
+  childOSCount?: number; // Ex: 16
+
+  // Financial Advances
+  advancePayments?: {
+    id: string;
+    amount: number;
+    date: string;
+    method: string;
+    notes?: string;
+    receivableId?: string;
+    registeredBy?: string;
   }[];
 
   // Preventive Maintenance fields
@@ -551,6 +575,12 @@ export type AccountsReceivable = {
   originalAmount?: number;
   paymentHistory?: PaymentHistory[];
   creationDate?: string;
+  isAdvancePayment?: boolean;
+  parentQuoteNumber?: string;
+  unitIdentifier?: string;
+  notes?: string;
+  method?: string;
+  deletedAt?: string;
 };
 
 export type ComodatoAsset = {

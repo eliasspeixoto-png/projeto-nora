@@ -38,6 +38,7 @@ import {
     createToolAdmin,
     bulkUpdateClientsAdmin,
     addOSNoteAdmin,
+    getBudgetPendingSummaryAdmin,
     settleReceivableAdmin,
     addObservationAdmin,
     searchObservationsAdmin,
@@ -723,6 +724,20 @@ const tools = [
           required: ['quoteId', 'items']
         }
       }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'get_budget_pending_summary',
+        description: 'Varre todas as Ordens de Serviço (e sub-OS vinculadas por caminhão/unidade/placa) de um determinado Orçamento (ex: 0145/26), trazendo o total concluído, o que falta fazer, o cronograma/previsão e todas as observações/relatórios técnicos de campo registrados.',
+        parameters: {
+          type: 'object',
+          properties: {
+            budgetCode: { type: 'string', description: 'Número do Orçamento ou O.S. (ex: "0145/26", "ORC 0145/26", "0145")' }
+          },
+          required: ['budgetCode']
+        }
+      }
     }
 ];
 
@@ -1025,6 +1040,9 @@ async function executeTool(toolCall: any, context: any) {
 
       case 'add_os_note':
         return await addOSNoteAdmin(companyId, args.osCode, args.type, args.text, displayName);
+
+      case 'get_budget_pending_summary':
+        return await getBudgetPendingSummaryAdmin(companyId, args.budgetCode);
 
       case 'add_observation':
           return await addObservationAdmin(companyId, args.tags, args.text, displayName, args.scope || 'local');
