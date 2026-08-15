@@ -79,21 +79,23 @@ export default function TaskCard({
   return (
     <div className="p-6 space-y-4 cursor-pointer h-full flex flex-col group bg-background/40 backdrop-blur-3xl rounded-[2rem] shadow-premium border-none transition-all duration-300 hover:scale-[1.02] active:scale-95" onClick={onClick}>
         <div className="flex justify-between items-start gap-4">
-             <div className="space-y-1 flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
+             <div className="space-y-1.5 flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
                     <div className="p-2 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors duration-500">
                         <TaskIcon className="h-4 w-4" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest opacity-40">{task.type}</span>
+                </div>
+                <div className="space-y-0.5">
+                    <CardTitle className="text-xl font-bold tracking-tight truncate text-foreground/90">
+                        {task.number}
+                    </CardTitle>
                     {task.unitIdentifier && (
-                        <Badge variant="outline" className="h-5 px-2 font-bold text-[9px] bg-primary/10 text-primary border-primary/20">
+                        <div className="text-xl font-bold tracking-tight text-blue-600 dark:text-blue-400 truncate">
                             {task.unitIdentifier}
-                        </Badge>
+                        </div>
                     )}
                 </div>
-                <CardTitle className="text-xl font-semibold tracking-tight truncate text-foreground/90">
-                    {task.number}
-                </CardTitle>
             </div>
             <div className="flex flex-col items-end gap-1">
                 <Badge variant={currentStatus.variant} className="h-6 px-3 rounded-full font-semibold text-xs uppercase tracking-widest shrink-0 shadow-lg shadow-black/5 transition-all group-hover:scale-105">
