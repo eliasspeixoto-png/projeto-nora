@@ -7,19 +7,24 @@ interface SendUniversalEmailParams {
   subject: string;
   text: string;
   html?: string;
+  companyEmail?: string;
+  companyAppPassword?: string;
+  companyName?: string;
 }
 
 /**
  * @fileOverview Dispatcher Universal de E-mail para NORA Pro.
  * Tenta enviar via:
- * 1. SMTP / Senha de App do Gmail (SMTP_USER + SMTP_PASS)
- * 2. SendGrid API (SENDGRID_API_KEY)
- * 3. Gmail API OAuth2 (GMAIL_CLIENT_ID + GMAIL_REFRESH_TOKEN)
+ * 1. SMTP Dinâmico da Empresa (companyEmail + companyAppPassword)
+ * 2. SMTP das Variáveis de Ambiente / Senha de App Global
+ * 3. SendGrid API (SENDGRID_API_KEY)
+ * 4. Gmail API OAuth2 (GMAIL_CLIENT_ID + GMAIL_REFRESH_TOKEN)
  */
-export async function sendUniversalEmail({ to, subject, text, html }: SendUniversalEmailParams) {
-  // 1. Prioridade: SMTP com Senha de App do Gmail ou Servidor Próprio
-  const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER || process.env.GMAIL_USER;
-  const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.GMAIL_APP_PASSWORD;
+export async function sendUniversalEmail({ to, subject, text, html, companyEmail, companyAppPassword, companyName }: SendUniversalEmailParams) {
+  // 1. Prioridade: SMTP Dinâmico da Empresa ou Variáveis Globais
+  const smtpUser = companyEmail || process.env.SMTP_USER || process.env.EMAIL_USER || process.env.GMAIL_USER || 'contatoesp.tec@gmail.com';
+  const smtpPass = (companyAppPassword ? companyAppPassword.replace(/\s+/g, '') : null) || process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.GMAIL_APP_PASSWORD || 'nhhkbeocckssjzpp';
+  const senderName = companyName || 'ESP-TEC / NORA Pro';
 
   if (smtpUser && smtpPass) {
     try {
@@ -38,14 +43,14 @@ export async function sendUniversalEmail({ to, subject, text, html }: SendUniver
       });
 
       const info = await transporter.sendMail({
-        from: `"ESP-TEC / NORA Pro" <${smtpUser}>`,
+        from: `"${senderName}" <${smtpUser}>`,
         to,
         subject,
         text,
         html: html || text.replace(/\n/g, '<br>'),
       });
 
-      return { success: true, messageId: info.messageId, provider: 'smtp' };
+      return { success: true, messageId: info.messageId, provider: 'smtp', fromEmail: smtpUser };
     } catch (smtpErr: any) {
       console.warn('Falha no envio via SMTP, tentando provedores alternativos:', smtpErr.message);
     }

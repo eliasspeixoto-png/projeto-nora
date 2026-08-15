@@ -416,6 +416,7 @@ export type Company = {
   phone?: string;
   whatsapp?: string;
   email?: string;
+  emailAppPassword?: string;
   cep?: string;
   street?: string;
   number?: string;

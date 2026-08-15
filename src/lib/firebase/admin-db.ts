@@ -1142,6 +1142,17 @@ export const addFotoOSAdmin = async (companyId: string, osId: string, url: strin
     }
 };
 
+export const getCompanyAdmin = async (companyId: string) => {
+    try {
+        const doc = await firestore.collection(COMPANIES_COLLECTION).doc(companyId).get();
+        if (!doc.exists) return null;
+        return { id: doc.id, ...doc.data() } as any;
+    } catch (e) {
+        console.error("Error fetching company:", e);
+        return null;
+    }
+};
+
 export const getCompanyAiSettingsAdmin = async (companyId: string) => {
     try {
         const doc = await firestore.collection(COMPANIES_COLLECTION).doc(companyId).get();

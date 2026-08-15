@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Copy, Loader2, QrCode, Smartphone, RefreshCw, CheckCircle2, Server, AlertCircle, PowerOff, Terminal } from "lucide-react";
+import { Copy, Loader2, QrCode, Smartphone, RefreshCw, CheckCircle2, Server, AlertCircle, PowerOff, Terminal, Mail, Key, ShieldCheck, ExternalLink, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -9,6 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/firebase/auth/use-user";
+import { updateCompany } from "@/lib/firebase/firestore";
 
 export default function WhatsappConnectionTab() {
     const { toast } = useToast();
@@ -20,10 +22,113 @@ export default function WhatsappConnectionTab() {
     const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
     const [isResetting, setIsResetting] = useState(false);
 
-    // Configurações de automação
+    // Configurações de automação WhatsApp
     const [autoQuote, setAutoQuote] = useState(true);
     const [autoOs, setAutoOs] = useState(true);
     const [notifyTech, setNotifyTech] = useState(false);
+
+    // Integração de E-mail Corporativo Dinâmica por Empresa
+    const { company, firebase } = useAuth();
+    const [emailAddress, setEmailAddress] = useState("");
+    const [emailAppPassword, setEmailAppPassword] = useState("");
+    const [isSavingEmail, setIsSavingEmail] = useState(false);
+    const [isTestingEmail, setIsTestingEmail] = useState(false);
+    const [emailTestedSuccess, setEmailTestedSuccess] = useState<boolean | null>(null);
+
+    // Regras de Automação de E-mail
+    const [autoEmailQuote, setAutoEmailQuote] = useState(true);
+    const [autoEmailOs, setAutoEmailOs] = useState(true);
+
+    useEffect(() => {
+        if (company) {
+            setEmailAddress(company.email || "");
+            setEmailAppPassword((company as any).emailAppPassword || "");
+            if (company.email && (company as any).emailAppPassword) {
+                setEmailTestedSuccess(true);
+            }
+        }
+    }, [company]);
+
+    const handleSaveEmailSettings = async () => {
+        if (!company?.id || !firebase?.db) {
+            toast({ variant: "destructive", title: "Empresa não autenticada." });
+            return;
+        }
+        setIsSavingEmail(true);
+        try {
+            await updateCompany(firebase.db, company.id, {
+                email: emailAddress.trim(),
+                emailAppPassword: emailAppPassword.trim(),
+            });
+            toast({
+                title: "Configurações Salvas!",
+                description: "O e-mail corporativo da empresa foi atualizado com sucesso.",
+            });
+        } catch (err: any) {
+            toast({
+                variant: "destructive",
+                title: "Erro ao salvar",
+                description: err.message || "Não foi possível salvar os dados.",
+            });
+        } finally {
+            setIsSavingEmail(false);
+        }
+    };
+
+    const handleTestEmailConnection = async () => {
+        if (!emailAddress || !emailAppPassword) {
+            toast({
+                variant: "destructive",
+                title: "Campos Incompletos",
+                description: "Informe o E-mail Corporativo e a Senha de App de 16 caracteres para testar.",
+            });
+            return;
+        }
+
+        setIsTestingEmail(true);
+        try {
+            const res = await fetch("/api/mail/test-connection", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: emailAddress.trim(),
+                    appPassword: emailAppPassword.trim(),
+                    to: emailAddress.trim(),
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setEmailTestedSuccess(true);
+                toast({
+                    title: "✅ E-mail Enviado com Sucesso!",
+                    description: `Um e-mail de teste foi entregue em ${emailAddress}. Conexão 100% validada!`,
+                });
+                // Salva automaticamente após validação
+                if (company?.id && firebase?.db) {
+                    await updateCompany(firebase.db, company.id, {
+                        email: emailAddress.trim(),
+                        emailAppPassword: emailAppPassword.trim(),
+                    });
+                }
+            } else {
+                setEmailTestedSuccess(false);
+                toast({
+                    variant: "destructive",
+                    title: "Falha na Conexão",
+                    description: data.error || "Não foi possível autenticar com o Google SMTP.",
+                });
+            }
+        } catch (err: any) {
+            setEmailTestedSuccess(false);
+            toast({
+                variant: "destructive",
+                title: "Erro de Rede",
+                description: err.message || "Erro ao conectar com o servidor.",
+            });
+        } finally {
+            setIsTestingEmail(false);
+        }
+    };
 
     const apiData = {
         token: "nora_sk_live_98a7sd98f7as9d8f7sa9df87",
@@ -354,6 +459,139 @@ export default function WhatsappConnectionTab() {
                     </div>
 
                 </div>
+
+                {/* SEÇÃO 2: CONEXÃO DE E-MAIL CORPORATIVO (DINÂMICA POR EMPRESA) */}
+                <div className="pt-8 border-t border-border/40 space-y-6">
+                    <header className="space-y-1">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xl font-semibold uppercase tracking-tighter opacity-80 flex items-center gap-2">
+                                <Mail className="h-6 w-6 text-primary" />
+                                Conexão de E-mail Corporativo
+                            </h3>
+                            {emailTestedSuccess ? (
+                                <Badge className="bg-green-500/10 text-green-600 border-green-500/20 px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-[10px]">
+                                    <CheckCircle2 className="w-3 h-3 mr-1.5 inline" /> E-mail Operacional
+                                </Badge>
+                            ) : (
+                                <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-[10px]">
+                                    Configuração Pendente
+                                </Badge>
+                            )}
+                        </div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground opacity-100">
+                            Configure o e-mail da sua empresa para a NORA enviar orçamentos em PDF e notificações automáticas
+                        </p>
+                    </header>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                        {/* Painel Esquerdo - Formulário de Conexão */}
+                        <div className="space-y-5 bg-background/50 border border-border/40 rounded-3xl p-6">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-1.5">
+                                    <Mail className="w-3.5 h-3.5 text-primary" /> E-mail Corporativo de Envio
+                                </Label>
+                                <Input 
+                                    placeholder="ex: contato@suaempresa.com.br ou empresa@gmail.com" 
+                                    value={emailAddress}
+                                    onChange={(e) => setEmailAddress(e.target.value)}
+                                    className="h-12 rounded-xl bg-background border-border/40 font-semibold"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-1.5">
+                                        <Key className="w-3.5 h-3.5 text-primary" /> Senha de App do Google / SMTP (16 caracteres)
+                                    </Label>
+                                    <a 
+                                        href="https://myaccount.google.com/apppasswords" 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                                    >
+                                        Gerar no Google <ExternalLink className="w-2.5 h-2.5" />
+                                    </a>
+                                </div>
+                                <Input 
+                                    type="password"
+                                    placeholder="ex: abcd efgh ijkl mnop" 
+                                    value={emailAppPassword}
+                                    onChange={(e) => setEmailAppPassword(e.target.value)}
+                                    className="h-12 rounded-xl bg-background border-border/40 font-mono tracking-widest font-semibold"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-3 pt-2">
+                                <Button
+                                    onClick={handleTestEmailConnection}
+                                    disabled={isTestingEmail || !emailAddress || !emailAppPassword}
+                                    className="flex-1 h-12 rounded-xl font-bold uppercase tracking-widest text-[10px] bg-primary text-white hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20"
+                                >
+                                    {isTestingEmail ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Testando Envio...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Send className="w-3.5 h-3.5 mr-2" /> Salvar e Testar Conexão
+                                        </>
+                                    )}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleSaveEmailSettings}
+                                    disabled={isSavingEmail}
+                                    className="h-12 px-6 rounded-xl font-bold uppercase tracking-widest text-[10px] border-border/40"
+                                >
+                                    {isSavingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apenas Salvar"}
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Painel Direito - Guia Passo a Passo para Novas Empresas */}
+                        <div className="space-y-5 bg-primary/5 border border-primary/10 rounded-3xl p-6">
+                            <h4 className="font-bold text-xs uppercase tracking-widest text-primary flex items-center gap-2">
+                                <ShieldCheck className="w-4 h-4 text-primary" /> Como Conectar o E-mail da Empresa em 3 Passos:
+                            </h4>
+
+                            <div className="space-y-4 text-xs">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-primary/20 text-primary font-bold flex items-center justify-center shrink-0 text-[11px]">
+                                        1
+                                    </div>
+                                    <p className="text-muted-foreground leading-relaxed">
+                                        No Gmail da empresa, certifique-se de que a <strong className="text-foreground">Verificação em 2 etapas</strong> está ativada.
+                                    </p>
+                                </div>
+
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-primary/20 text-primary font-bold flex items-center justify-center shrink-0 text-[11px]">
+                                        2
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-muted-foreground leading-relaxed">
+                                            Acesse <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="text-primary font-bold underline inline-flex items-center gap-0.5">myaccount.google.com/apppasswords <ExternalLink className="w-2.5 h-2.5 inline"/></a>, digite o nome <strong className="text-foreground">NORA</strong> e clique em Criar.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-primary/20 text-primary font-bold flex items-center justify-center shrink-0 text-[11px]">
+                                        3
+                                    </div>
+                                    <p className="text-muted-foreground leading-relaxed">
+                                        Copie o código amarelo de <strong className="text-foreground">16 letras</strong> gerado, cole no campo ao lado e clique em <strong className="text-foreground">Salvar e Testar Conexão</strong>.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="p-3 bg-background/60 rounded-xl border border-border/40 text-[11px] text-muted-foreground">
+                                💡 <strong className="text-foreground">Pronto!</strong> A partir disso, todos os orçamentos, propostas e avisos disparados pela NORA sairão com o endereço oficial da sua empresa.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     );

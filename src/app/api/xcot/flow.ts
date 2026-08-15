@@ -1062,10 +1062,16 @@ async function executeTool(toolCall: any, context: any) {
       case 'send_email': {
         try {
           const { sendUniversalEmail } = await import('@/lib/mail/dispatcher');
+          const { getCompanyAdmin } = await import('@/lib/firebase/admin-db');
+          const companyData: any = await getCompanyAdmin(companyId);
+          const currentCompanyName = companyData?.name || companyData?.tradeName || 'ESP-TEC Instalações';
+          const currentCompanyEmail = companyData?.email;
+          const currentAppPassword = companyData?.emailAppPassword;
+
           const htmlBody = `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
               <div style="background-color: #0f172a; padding: 24px; text-align: center;">
-                <h2 style="color: #38bdf8; margin: 0; font-size: 20px; font-weight: bold;">ESP-TEC Instalações</h2>
+                <h2 style="color: #38bdf8; margin: 0; font-size: 20px; font-weight: bold;">${currentCompanyName}</h2>
                 <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;">Assistente Virtual NORA Pro</p>
               </div>
               <div style="padding: 28px; line-height: 1.6; color: #334155;">
@@ -1079,7 +1085,7 @@ async function executeTool(toolCall: any, context: any) {
                   </div>
                 ` : ''}
                 <p style="font-size: 12px; color: #94a3b8; margin-top: 28px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-                  Mensagem enviada automaticamente pela NORA Pro em nome de ${displayName}.
+                  Mensagem enviada automaticamente pela NORA Pro em nome de ${displayName} (${currentCompanyName}).
                 </p>
               </div>
             </div>
@@ -1088,12 +1094,17 @@ async function executeTool(toolCall: any, context: any) {
             to: args.to,
             subject: args.subject,
             text: args.messageText,
-            html: htmlBody
+            html: htmlBody,
+            companyEmail: currentCompanyEmail,
+            companyAppPassword: currentAppPassword,
+            companyName: currentCompanyName,
           });
           if (res.success) {
-            return { success: true, message: `E-mail enviado com sucesso para ${args.to} (via ${res.provider}).` };
+            return { success: true, message: `E-mail enviado com sucesso para ${args.to} a partir de ${res.fromEmail || currentCompanyEmail || 'e-mail da empresa'}.` };
           } else {
-            return { error: `Falha ao enviar e-mail: ${res.error}` };
+            return { 
+              error: `Falha ao enviar e-mail: ${res.error}. Para configurar o e-mail da sua empresa, acesse a aba 'WhatsApp & E-mail' nas Configurações da Empresa, insira seu E-mail Corporativo e a Senha de App gerada em https://myaccount.google.com/apppasswords.` 
+            };
           }
         } catch (e: any) {
           return { error: `Erro na execução do envio de e-mail: ${e.message}` };
