@@ -1312,11 +1312,16 @@ INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
    - Ao chamar 'add_observation', você DEVE SEMPRE incluir nas tags todo o contexto da conversa: se estiver tratando de uma OS (ex: "OS-0145/26", "145"), de um cliente (ex: "FM Terraplenagem"), de veículos (ex: "BT 145", "BT 019") ou de categoria ("pendências", "defeito"), INCLUA TODAS ESSAS TAGS para permitir cruzamento automático.
    - Ao consultar pendências ou defeitos de uma OS ou cliente ('search_observations'), passe nas tags o código da OS ("OS-0145/26", "145"), o nome do cliente e a categoria ("pendências" ou "defeito") para encontrar imediatamente qualquer registro vinculado.
 9. **BAIXA NO CONTAS A RECEBER (FINANCEIRO):** Se o usuário pedir para marcar uma conta como paga, quitar ou dar baixa no financeiro (ex: "marca como pago as pendências do Fabio Fontes", "marca o ORC-0122/26 como pago"), você DEVE chamar IMEDIATAMENTE a ferramenta 'settle_receivable' informando o nome do cliente ou número da OS/Orçamento. NUNCA prometa fazer ou explique IDs para o usuário sem antes executar a ferramenta no mesmo fluxo!
-10. **REGRA MANDATÓRIA DE CERCA ELÉTRICA (USO OBRIGATÓRIO DA CALCULADORA DE CERCA):**
-   - Se o usuário pedir para fazer, gerar, calcular ou enviar qualquer orçamento de **Cerca Elétrica** (ex: "faz um orçamento de cerca elétrica...", "orçamento cerca para Elias...", "calcula cerca 10m por 28m..."), você é **TERMINANTEMENTE PROIBIDA** de usar a ferramenta 'create_quote' ou de listar itens avulsos manualmente.
-   - Você **DEVE OBRIGATORIAMENTE USAR A CALCULADORA DE CERCA ELÉTRICA** através da ferramenta **'save_fence_quote'** (ou 'fill_fence_form').
-   - A ferramenta 'save_fence_quote' calcula matematicamente todas as hastes de canto/passagem, isoladores, cabos de alta tensão, fio de aterramento, sirene e central de choque no sistema e já salva a proposta oficial com PDF para envio imediato.
-   - Passe todos os parâmetros extraídos do pedido (dimensões, central, hastes e 'clientEmail') diretamente para 'save_fence_quote'.
+10. **REGRA MANDATÓRIA DE CERCA ELÉTRICA (MEDIDA LINEAR E GEOMETRIA):**
+   - **MEDIDA LINEAR (SOMA DOS LADOS - NUNCA MULTIPLICAR / ÁREA):** Cerca elétrica é SEMPRE medida linear por perímetro somado, JAMAIS por multiplicação de área (m²). Se informarem "10m de frente e 34m lateral", o comprimento linear é a soma dos lados: 10 + 34 = 44 metros lineares (Formato L).
+   - **RECONHECIMENTO DOS FORMATOS GEOMÉTRICOS:**
+     * **Reta / Linear (1 lado):** Apenas 1 extensão reta (ex: "20 metros de cerca", "10m de frente"). Use shape: 'linear', dimensions: { linear_length: X }.
+     * **Formato em L (2 lados):** Frente + 1 lateral (ex: "10m de frente e 34m lateral"). Use shape: 'l-shape', dimensions: { l_sideA: 10, l_sideB: 34 }.
+     * **Formato em U ou C (3 lados):** Frente + 2 laterais ou Frente + Lateral + Fundos (ex: "10m frente, 15m lateral e 10m fundo"). Use shape: 'u-shape', dimensions: { u_sideA: 10, u_sideB: 15, u_sideC: 10 }.
+     * **Formato Retangular / Quadrado / Fechado (4 lados):** Perímetro completo do imóvel/terreno (ex: "terreno 10x30 todo fechado" = 10+30+10+30 = 80m). Use shape: 'quadrilateral', dimensions: { l_sideA: 10, l_sideB: 30 }.
+   - **ESCLARECIMENTO DE DÚVIDAS:** Se o usuário disser apenas "terreno 10x30" ou passar medidas ambíguas sem especificar quais lados serão cercados, pergunte de forma objetiva:
+     * "[[ azul: A cerca será instalada apenas na frente (10m), em L (frente + 1 lateral), em U (3 lados) ou fechando o terreno completo nos 4 lados? ]]"
+   - **USO OBRIGATÓRIO DA CALCULADORA DE CERCA:** Você DEVE chamar 'save_fence_quote' com os parâmetros calculados para gerar o dimensionamento exato de todas as hastes, isoladores, cabos e central, salvando e gerando o PDF da proposta.
 `;
 
   // Persona 1: CLIENTE (Concierge do Portal)
