@@ -497,8 +497,39 @@ const tools = [
       type: 'function',
       function: {
         name: 'save_fence_quote',
-        description: 'Aciona o botão de salvar o orçamento de cerca elétrica preenchido.',
-        parameters: { type: 'object', properties: {} }
+        description: 'Calcula, preenche e salva o orçamento de cerca elétrica no sistema de ponta a ponta. Use sempre que o usuário pedir para criar, fazer ou enviar um orçamento de cerca elétrica.',
+        parameters: {
+          type: 'object',
+          properties: {
+            clientId: { type: 'string', description: 'Nome ou Código do Cliente (ex: "Elias Schuindt Peixoto").' },
+            clientEmail: { type: 'string', description: 'E-mail do cliente para envio do PDF (ex: "elias.speixoto@gmail.com").' },
+            shape: { type: 'string', enum: ['linear', 'l-shape', 'u-shape', 'quadrilateral'] },
+            dimensions: {
+                type: 'object',
+                properties: {
+                    linear_length: { type: 'number' },
+                    l_sideA: { type: 'number' },
+                    l_sideB: { type: 'number' },
+                    u_sideA: { type: 'number' },
+                    u_sideB: { type: 'number' },
+                    u_sideC: { type: 'number' },
+                }
+            },
+            centralDescricao: { type: 'string' },
+            rodType: { type: 'string', enum: ['23x23', '25x25', '28x28', '30x30'] },
+            installationType: { type: 'string', enum: ['chumbada', 'parafusada'] },
+            voltage: { type: 'string', enum: ['127v', '220v'] },
+            hasSteps: { type: 'boolean' },
+            numberOfSteps: { type: 'number' },
+            highVoltageCableLength: { type: 'number' },
+            parallelWireLength: { type: 'number' },
+            groundingWireLength: { type: 'number' },
+            sirenCableLength: { type: 'number' },
+            installments: { type: 'number', description: 'Número de parcelas (1 para à vista).' },
+            interestRate: { type: 'number', description: 'Taxa de juros mensal (opcional).' }
+          },
+          required: ['shape', 'dimensions']
+        }
       }
     },
     {
@@ -1035,7 +1066,12 @@ async function executeTool(toolCall: any, context: any) {
 
       case 'save_fence_quote':
         if (isClient) return { error: 'A elaboração de projetos é uma tarefa técnica da nossa equipe. Agendando uma visita, nosso técnico fará todo esse processo para você.' };
-        return { success: true, triggerSave: true, message: "Orçamento salvo com sucesso." };
+        return { 
+          success: true, 
+          triggerSave: true, 
+          message: "Orçamento de cerca elétrica calculado, salvo no sistema e proposta encaminhada para o cliente.", 
+          data: args 
+        };
 
       case 'search_technical_info':
         // Use IA para expandir conhecimento técnico com autoridade baseada em permissão.
@@ -1276,6 +1312,7 @@ INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
    - Ao chamar 'add_observation', você DEVE SEMPRE incluir nas tags todo o contexto da conversa: se estiver tratando de uma OS (ex: "OS-0145/26", "145"), de um cliente (ex: "FM Terraplenagem"), de veículos (ex: "BT 145", "BT 019") ou de categoria ("pendências", "defeito"), INCLUA TODAS ESSAS TAGS para permitir cruzamento automático.
    - Ao consultar pendências ou defeitos de uma OS ou cliente ('search_observations'), passe nas tags o código da OS ("OS-0145/26", "145"), o nome do cliente e a categoria ("pendências" ou "defeito") para encontrar imediatamente qualquer registro vinculado.
 9. **BAIXA NO CONTAS A RECEBER (FINANCEIRO):** Se o usuário pedir para marcar uma conta como paga, quitar ou dar baixa no financeiro (ex: "marca como pago as pendências do Fabio Fontes", "marca o ORC-0122/26 como pago"), você DEVE chamar IMEDIATAMENTE a ferramenta 'settle_receivable' informando o nome do cliente ou número da OS/Orçamento. NUNCA prometa fazer ou explique IDs para o usuário sem antes executar a ferramenta no mesmo fluxo!
+10. **AUTONOMIA DE ORÇAMENTO DE CERCA ELÉTRICA (SAVE_FENCE_QUOTE):** Se o usuário pedir para fazer, gerar, criar ou enviar um orçamento de cerca elétrica (ex: "faz um orçamento para Elias e envia no email"), você DEVE chamar a ferramenta 'save_fence_quote' com todos os parâmetros (dimensões, central, hastes e 'clientEmail') para salvar no sistema e disparar a proposta de ponta a ponta em uma única ação. Jamais interrompa o fluxo perguntando se pode salvar quando o usuário já solicitou a geração do orçamento!
 `;
 
   // Persona 1: CLIENTE (Concierge do Portal)
