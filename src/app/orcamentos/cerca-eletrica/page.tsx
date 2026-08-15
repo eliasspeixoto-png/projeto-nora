@@ -11,7 +11,7 @@ import { Client, Product, Quote, QuoteItem, QuoteData, PostCounts } from "@/lib/
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, User, ListChecks, Search, Save, Trash2, Shield, ShieldQuestion, X, Check, ChevronsUpDown, Edit, Percent, Bot, PlusCircle } from "lucide-react";
-import { getProducts, getClients, addQuote, getCompany, getQuote, updateQuote, updateProduct } from "@/lib/firebase/firestore";
+import { getProducts, getClients, addQuote, getCompany, getQuote, updateQuote, updateProduct, addClient } from "@/lib/firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/firebase/auth/use-user";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -694,28 +694,51 @@ export default function FenceQuotePage() {
                 allItemsRef.current = [];
             }
 
-            // 1. IDENTIFICAÇÃO DO CLIENTE (PRIORIDADE MESTRIA 3.0 - BEST MATCH)
+            // 1. IDENTIFICAÇÃO DO CLIENTE (PRIORIDADE MESTRIA 3.0 - AUTO-CADASTRO E BEST MATCH)
             if (data.clientId) {
                 isIdentifyingRef.current = true;
-                // Usamos a lista atual via Ref para evitar stale closure
-                const client = findBestMatch(clientsRef.current, data.clientId, c => `${c.name} ${c.clientCode} ${c.id}`);
+                let client = findBestMatch(clientsRef.current, data.clientId, c => `${c.name} ${c.clientCode} ${c.id}`);
                 
                 if (client) {
                     selectedClientIdRef.current = client.id;
                     setSelectedClientId(client.id);
                     form.setValue('clientId', client.id);
                     toast({ title: "Cliente Identificado", description: client.name });
-                } else {
-                    console.log('[NORA FILL] Client not found:', data.clientId);
-                    toast({ variant: "destructive", title: "Cliente não encontrado", description: data.clientId });
+                } else if (companyId && firebase.db && firebase.auth) {
+                    console.log('[NORA FILL] Client not found, creating automatically:', data.clientId);
+                    try {
+                        const newClientId = await addClient(firebase.db, firebase.auth, {
+                            name: data.clientId,
+                            status: 'Ativo',
+                            companyId,
+                            creationDate: new Date().toISOString(),
+                        } as any);
+                        const newClientObj: Client = { id: newClientId, name: data.clientId, status: 'Ativo', companyId } as any;
+                        setClients(prev => [...prev, newClientObj]);
+                        clientsRef.current = [...clientsRef.current, newClientObj];
+                        selectedClientIdRef.current = newClientId;
+                        setSelectedClientId(newClientId);
+                        form.setValue('clientId', newClientId);
+                        toast({ title: "Cliente Cadastrado e Selecionado", description: data.clientId });
+                    } catch (e: any) {
+                        console.error('Erro ao auto-cadastrar cliente na cerca:', e);
+                    }
                 }
                 isIdentifyingRef.current = false;
             }
 
-            // 2. IDENTIFICAÇÃO DA CENTRAL (PRIORIDADE MESTRIA 3.0 - BEST MATCH)
+            // 2. IDENTIFICAÇÃO DA CENTRAL (PRIORIDADE MESTRIA 3.0 - BEST MATCH & FALLBACK INTELIGENTE)
             if (data.centralDescricao) {
-                const central = findBestMatch(productsRef.current, data.centralDescricao, p => `${p.description} ${p.segment} ${p.item}`);
+                let central: Product | null = findBestMatch(productsRef.current, data.centralDescricao, p => `${p.description} ${p.segment} ${p.item} ${p.model || ''}`);
                 
+                if (!central) {
+                    // Fallback para qualquer central do estoque
+                    central = productsRef.current.find(p => {
+                        const d = (p.description || '').toLowerCase();
+                        return d.includes('central de choque') || d.includes('eletrificador') || (p.segment === 'CERCAS');
+                    }) || null;
+                }
+
                 if (central) {
                     selectedCentralIdRef.current = central.id;
                     setSelectedCentralId(central.id);
@@ -723,11 +746,6 @@ export default function FenceQuotePage() {
                 } else {
                     console.log('[NORA PAGE] Central not found:', data.centralDescricao);
                     setCentralSearch(data.centralDescricao);
-                    toast({ 
-                        variant: "destructive", 
-                        title: "Modelo não identificado", 
-                        description: `Não encontramos "${data.centralDescricao}" no banco. Clique no campo Central para selecionar.` 
-                    });
                 }
             }
 
