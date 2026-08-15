@@ -180,9 +180,7 @@ export default function FenceQuotePage() {
     const allItemsRef = useRef<QuoteItem[]>([]);
     const isIdentifyingRef = useRef(false);
     const noraTriggeredRef = useRef(false);
-
-
-
+    const isAutomatedNoraRef = useRef(false);
 
     // Suporte a gatilhos automáticos vindos do redirecionamento do Chat (Nora)
     useEffect(() => {
@@ -205,6 +203,7 @@ export default function FenceQuotePage() {
                 if (trigger === 'fill_fence_form') {
                     noraFillRef.current?.({ detail: data } as any);
                 } else if (trigger === 'save_fence_quote') {
+                    isAutomatedNoraRef.current = true;
                     // Para salvar automático, garantimos preenchimento primeiro
                     if (data && Object.keys(data).length > 0) {
                         console.log('[NORA PAGE] Pre-filling before save...');
@@ -633,9 +632,12 @@ export default function FenceQuotePage() {
                 
                 toast({ title: "Sucesso!", description: `Salvo com o número ${quoteNumber}.` });
 
-                // Disparo Automático de E-mail com Link do PDF da Proposta
+                const wasAutomated = isAutomatedNoraRef.current || isNoraRunning;
+                isAutomatedNoraRef.current = false;
+
+                // Disparo Automático de E-mail SOMENTE quando gerado por Automação (NORA / Robô)
                 const targetEmail = client?.email || (client?.name?.toLowerCase().includes('elias') ? 'elias.speixoto@gmail.com' : null);
-                if (targetEmail) {
+                if (wasAutomated && targetEmail) {
                     try {
                         const pdfUrl = `${window.location.origin}/orcamentos/details/${newQuoteId}`;
                         sendQuoteEmailAction({
@@ -648,12 +650,14 @@ export default function FenceQuotePage() {
                             companyAppPassword: (company as any)?.emailAppPassword,
                         }).then(res => {
                             if (res?.success) {
-                                toast({ title: "E-mail Enviado!", description: `Proposta com PDF enviada para ${targetEmail}` });
+                                toast({ title: "E-mail Enviado!", description: `Proposta com PDF enviada automaticamente para ${targetEmail}` });
                             }
                         }).catch(e => console.error('Erro no envio de email de cerca:', e));
                     } catch (e) {
                         console.error('Erro no envio de email de cerca:', e);
                     }
+                } else if (!wasAutomated) {
+                    console.log('[MANUAL QUOTE] Orçamento gerado manualmente. Envio automático de e-mail não disparado para permitir revisão e edição.');
                 }
                 
                 // Redirecionar para visualização do novo orçamento
@@ -838,6 +842,7 @@ export default function FenceQuotePage() {
 
         noraSaveRef.current = () => {
             console.log('[NORA PAGE] handleNoraSave via Ref');
+            isAutomatedNoraRef.current = true;
             toast({ title: "Salvamento Iniciado", description: "O comando da Nora chegou ao formulário." });
             if (saveQuoteRef.current) {
                 saveQuoteRef.current();
