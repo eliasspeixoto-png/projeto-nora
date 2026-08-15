@@ -212,6 +212,18 @@ export default function FenceQuotePage() {
                     
                     // MESTRIA: Verificação de segurança que aguarda o cálculo dos itens (allItems) via Refs (Tempo Real)
                     const attemptSave = (retryCount = 0) => {
+                        // Se a central ainda não foi selecionada, auto-seleciona a primeira central compatível do estoque
+                        if (!selectedCentralIdRef.current && productsRef.current.length > 0) {
+                            const defaultCentral = productsRef.current.find(p => {
+                                const d = (p.description || '').toLowerCase();
+                                return d.includes('central') || d.includes('eletrificador') || (p.segment === 'CERCAS');
+                            }) || productsRef.current[0];
+                            if (defaultCentral) {
+                                selectedCentralIdRef.current = defaultCentral.id;
+                                setSelectedCentralId(defaultCentral.id);
+                            }
+                        }
+
                         const isWorking = isIdentifyingRef.current;
                         const hasClient = !!selectedClientIdRef.current;
                         const hasCentral = !!selectedCentralIdRef.current;
@@ -756,25 +768,31 @@ export default function FenceQuotePage() {
             }
 
             // 2. IDENTIFICAÇÃO DA CENTRAL (PRIORIDADE MESTRIA 3.0 - BEST MATCH & FALLBACK INTELIGENTE)
+            let central: Product | null = null;
             if (data.centralDescricao) {
-                let central: Product | null = findBestMatch(productsRef.current, data.centralDescricao, p => `${p.description} ${p.segment} ${p.item} ${p.model || ''}`);
-                
-                if (!central) {
-                    // Fallback para qualquer central do estoque
-                    central = productsRef.current.find(p => {
-                        const d = (p.description || '').toLowerCase();
-                        return d.includes('central de choque') || d.includes('eletrificador') || (p.segment === 'CERCAS');
-                    }) || null;
-                }
+                central = findBestMatch(productsRef.current, data.centralDescricao, p => `${p.description} ${p.segment} ${p.item} ${p.model || ''}`);
+            }
+            
+            // Fallback: se não veio centralDescricao ou não deu match, seleciona a central de choque do estoque
+            if (!central && productsRef.current.length > 0) {
+                const targetVolt = (data.voltage || '127v').toLowerCase();
+                central = productsRef.current.find(p => {
+                    const d = (p.description || '').toLowerCase();
+                    const isCentral = d.includes('central de choque') || d.includes('eletrificador') || (p.segment === 'CERCAS');
+                    return isCentral && d.includes(targetVolt);
+                }) || productsRef.current.find(p => {
+                    const d = (p.description || '').toLowerCase();
+                    return d.includes('central de choque') || d.includes('eletrificador') || (p.segment === 'CERCAS');
+                }) || productsRef.current[0] || null;
+            }
 
-                if (central) {
-                    selectedCentralIdRef.current = central.id;
-                    setSelectedCentralId(central.id);
-                    toast({ title: "Central Selecionada", description: central.description });
-                } else {
-                    console.log('[NORA PAGE] Central not found:', data.centralDescricao);
-                    setCentralSearch(data.centralDescricao);
-                }
+            if (central) {
+                selectedCentralIdRef.current = central.id;
+                setSelectedCentralId(central.id);
+                toast({ title: "Central Selecionada", description: central.description });
+            } else if (data.centralDescricao) {
+                console.log('[NORA PAGE] Central not found:', data.centralDescricao);
+                setCentralSearch(data.centralDescricao);
             }
 
             // 3. DEMAIS DADOS E GEOMETRIA
