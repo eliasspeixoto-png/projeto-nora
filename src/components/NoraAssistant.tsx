@@ -34,7 +34,7 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false); // Disabled by default for stability
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isRecording, setIsRecording] = useState(false);
@@ -228,11 +228,22 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
 
 
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 130)}px`;
+    }
+  };
+
   const handleSend = useCallback(async (messageText: string) => {
     const text = messageText.trim();
     if (!text || loading || !userProfile) return;
     
     setInput('');
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
     const userMsg: Message = { role: 'user', content: text, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
@@ -347,20 +358,20 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
             <Paperclip className="h-5 w-5" />
           </Button>
 
-          <Input 
-            ref={inputRef as any}
+          <textarea 
+            ref={inputRef}
+            rows={1}
             value={input} 
-            onChange={(e) => setInput(e.target.value)} 
-            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { 
-                if (e.key === 'Enter') { 
+            onChange={handleInputChange} 
+            onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => { 
+                if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey) { 
                     e.preventDefault();
-                    handleSend(e.currentTarget.value); 
+                    handleSend(input); 
                 } 
             }} 
-            suggestions={productSuggestions}
-            placeholder={isRecording ? "Gravando áudio..." : "Digite sua dúvida..."} 
+            placeholder={isRecording ? "Gravando áudio..." : "Digite sua mensagem..."} 
             className={cn(
-                "flex-1 h-10 border border-input rounded-lg px-4 py-2.5 text-sm bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all",
+                "flex-1 min-h-[40px] max-h-32 border border-input rounded-xl px-3.5 py-2.5 text-sm bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all resize-none overflow-y-auto leading-relaxed shadow-sm",
                 isRecording && "bg-red-50 text-red-600 placeholder:text-red-500 animate-pulse border-red-200"
             )} 
             disabled={loading || isRecording} 
