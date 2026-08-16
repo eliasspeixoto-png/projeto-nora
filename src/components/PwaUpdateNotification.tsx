@@ -25,27 +25,30 @@ const PwaUpdateNotification = () => {
     setIsUpdating(true);
 
     try {
+      // Tentar pular espera do SW (assíncrono sem travar)
       if ('serviceWorker' in navigator) {
-        const registration = await navigator.serviceWorker.getRegistration();
-        if (registration?.waiting) {
-          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-        }
+        navigator.serviceWorker.getRegistration().then(registration => {
+          if (registration?.waiting) {
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+        }).catch(console.warn);
       }
 
-      // Limpar caches antigos do navegador
+      // Tentar limpar caches (assíncrono sem travar)
       if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        await Promise.all(
-          cacheNames
-            .filter((name) => !name.includes('google-fonts'))
-            .map((name) => caches.delete(name))
-        );
+        caches.keys().then(cacheNames => {
+          return Promise.all(
+            cacheNames
+              .filter((name) => !name.includes('google-fonts'))
+              .map((name) => caches.delete(name))
+          );
+        }).catch(console.warn);
       }
-    } catch (err) {
-      console.warn('Erro ao limpar cache durante atualização:', err);
     } finally {
-      // Recarrega forçando busca no servidor
-      window.location.reload();
+      // Pequeno atraso para dar tempo ao SW de receber a mensagem, e forçar reload
+      setTimeout(() => {
+        window.location.href = window.location.pathname + '?v=' + new Date().getTime();
+      }, 300);
     }
   }, [isUpdating]);
 
