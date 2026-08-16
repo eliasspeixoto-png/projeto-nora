@@ -34,18 +34,68 @@ function convertMp3ToOpus(mp3Buffer) {
 }
 
 /**
- * Limpa o texto para fala humana perfeita: insere nome do usuario no inicio, pausas em virgulas e remove simbolos.
+ * Normaliza valores monetários e números de milhares para pronúncia fonética perfeita.
+ * Transforma '22.000' em '22 mil', '22.000,00' em '22 mil reais', '20000' em '20 mil', etc.
+ */
+function normalizeNumbersForSpeech(text) {
+    if (!text) return '';
+
+    let res = text;
+
+    // 1. Remove R$
+    res = res.replace(/R\$\s*/gi, '');
+
+    // 2. Valores com milhares e centavos: ex: 22.000,00 ou 4.500,50
+    // Casos de X.000,00 -> X mil reais
+    res = res.replace(/\b(\d+)\.000,00\s*(reais)?\b/gi, '$1 mil reais');
+    res = res.replace(/\b(\d+)\.000\s*(reais)?\b/gi, '$1 mil reais');
+    
+    // Casos de X.YYY,00 -> X mil e YYY reais (ex: 22.500,00 -> 22 mil e 500 reais)
+    res = res.replace(/\b(\d+)\.(\d{3}),00\s*(reais)?\b/gi, (m, mil, rest) => {
+        const rNum = parseInt(rest, 10);
+        return rNum === 0 ? `${mil} mil reais` : `${mil} mil e ${rNum} reais`;
+    });
+
+    // Casos de X.YYY com ou sem "reais" (ex: 22.000 reais, 20.000 reais, 4.500 reais, 64.000)
+    res = res.replace(/\b(\d+)\.(\d{3})\s*(reais)?\b/gi, (m, mil, rest, rWord) => {
+        const rNum = parseInt(rest, 10);
+        const suffix = rWord ? ' reais' : '';
+        return rNum === 0 ? `${mil} mil${suffix}` : `${mil} mil e ${rNum}${suffix}`;
+    });
+
+    // Casos de decimais simples zerados: ex: 150,00 reais -> 150 reais
+    res = res.replace(/\b(\d+),00\s*(reais)?\b/gi, '$1 reais');
+    // Casos de decimais com centavos: ex: 150,50 reais -> 150 reais e 50 centavos
+    res = res.replace(/\b(\d+),(\d{1,2})\s*(reais)?\b/gi, '$1 reais e $2 centavos');
+
+    // Casos de números redondos de milhares sem ponto: 20000 reais, 22000 reais, 64000 reais
+    res = res.replace(/\b(\d+)(000)\s*(reais)?\b/gi, (m, mil, zeros, rWord) => {
+        const suffix = rWord ? ' reais' : '';
+        return `${mil} mil${suffix}`;
+    });
+
+    return res;
+}
+
+/**
+ * Limpa o texto para fala humana perfeita: normaliza números/moedas, pontuação e remove símbolos.
  */
 function cleanTextForSpeech(text, firstName = 'Elias') {
     if (!text) return '';
 
     let clean = text
         .replace(/\[\[.*?\]\]/g, '')
-        .replace(/https?:\/\/\S+/g, '')
-        // Remove reticências ou sequências de pontos que o TTS lê como "ponto"
+        .replace(/https?:\/\/\S+/g, '');
+
+    // 1. Normaliza valores numéricos e financeiros antes de remover pontuações
+    clean = normalizeNumbersForSpeech(clean);
+
+    // 2. Converte apenas códigos de barras / EAN longos (12 a 14 dígitos) para leitura pausada dígito a dígito
+    clean = clean.replace(/\b\d{12,14}\b/g, (match) => match.split('').join(', '));
+
+    clean = clean
+        // Remove reticências ou sequências de pontos
         .replace(/\.{2,}/g, ' ')
-        // Converte códigos numéricos longos (5 a 14 dígitos, ex: 798455423628) para leitura dígito a dígito ("7, 9, 8, 4...")
-        .replace(/\b\d{5,14}\b/g, (match) => match.split('').join(', '))
         .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
         .replace(/\|/g, ' ')
         .replace(/[*_~`#^]/g, '')
@@ -54,8 +104,6 @@ function cleanTextForSpeech(text, firstName = 'Elias') {
         .trim();
 
     if (!clean) return '';
-
-    // (A injeção forçada do nome foi removida para obedecer ao System Prompt)
 
     // Preserva o ponto de interrogação (?) para a sintetizadora fazer a entonação perfeita de pergunta!
     clean = clean
@@ -110,4 +158,4 @@ async function textToSpeechBuffer(text, firstName = 'Elias') {
     return null;
 }
 
-module.exports = { textToSpeechBuffer };
+module.exports = { textToSpeechBuffer, cleanTextForSpeech, normalizeNumbersForSpeech };
