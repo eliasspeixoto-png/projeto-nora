@@ -815,6 +815,38 @@ export const createToolAdmin = async (companyId: string, data: any) => {
     return { id: docRef.id };
 };
 
+export const addVehicleNoteAdmin = async (companyId: string, vehicleTerm: string, noteText: string) => {
+    const snap = await firestore.collection(VEHICLES_COLLECTION).where("companyId", "==", companyId).get();
+    const cleanTerm = vehicleTerm.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    const doc = snap.docs.find(d => {
+        const data = d.data();
+        const plate = (data.plate || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const model = (data.model || '').toLowerCase();
+        const brand = (data.brand || '').toLowerCase();
+        return plate.includes(cleanTerm) || model.includes(vehicleTerm.toLowerCase()) || cleanTerm.includes(plate);
+    });
+
+    if (!doc) {
+        throw new Error(`Veículo não encontrado pelo termo "${vehicleTerm}".`);
+    }
+
+    const currentNotes = doc.data().notes ? doc.data().notes.trim() + '\n' : '';
+    const updatedNotes = currentNotes ? `${currentNotes}${noteText}` : noteText;
+
+    await doc.ref.update({
+        notes: updatedNotes
+    });
+
+    return {
+        success: true,
+        vehicleId: doc.id,
+        plate: doc.data().plate,
+        model: doc.data().model,
+        updatedNotes
+    };
+};
+
 export const getProductsAdmin = async (companyId: string) => {
     const snap = await firestore.collection(PRODUCTS_COLLECTION)
         .where("companyId", "==", companyId)

@@ -12,44 +12,45 @@
 
 import { z } from 'zod';
 import { callDeepSeek } from '@/lib/deepseek/client';
-import { 
-    getFinancialSummaryAdmin,
-    getPurchaseSummaryAdmin,
-    getCriticalStockAdmin,
-    getPendingTasksAdmin,
-    getTodayVisitsAdmin,
-    searchClientByCodeOrNameAdmin,
-    getCollectionStatsAdmin,
-    getOnlineTeamAdmin,
-    getDetailedListAdmin,
-    searchVisitByCodeAdmin,
-    searchQuoteByCodeAdmin,
-    getClientHistoryAdmin,
-    getClientMaterialsAdmin,
-    createClientAdmin,
-    createQuoteAdmin,
-    createVisitAdmin,
-    updateRecordAdmin,
-    deleteRecordAdmin,
-    createProductAdmin,
-    getProductsAdmin,
-    createSupplierAdmin,
-    createVehicleAdmin,
-    createToolAdmin,
-    bulkUpdateClientsAdmin,
-    addOSNoteAdmin,
-    getBudgetPendingSummaryAdmin,
-    settleReceivableAdmin,
-    addObservationAdmin,
-    searchObservationsAdmin,
-    scheduleMessageAdmin,
-    searchTeamMemberAdmin,
-    createTeamMemberAdmin,
-    createNotaFiscalAdmin,
-    addFotoOSAdmin,
-    processPaymentReceiptAdmin,
-    getCompanyAiSettingsAdmin,
-    editQuoteItemsAdmin
+import {
+  getFinancialSummaryAdmin,
+  getPurchaseSummaryAdmin,
+  getCriticalStockAdmin,
+  getPendingTasksAdmin,
+  getTodayVisitsAdmin,
+  searchClientByCodeOrNameAdmin,
+  getCollectionStatsAdmin,
+  getOnlineTeamAdmin,
+  getDetailedListAdmin,
+  searchVisitByCodeAdmin,
+  searchQuoteByCodeAdmin,
+  getClientHistoryAdmin,
+  getClientMaterialsAdmin,
+  createClientAdmin,
+  createQuoteAdmin,
+  createVisitAdmin,
+  updateRecordAdmin,
+  deleteRecordAdmin,
+  createProductAdmin,
+  getProductsAdmin,
+  createSupplierAdmin,
+  createVehicleAdmin,
+  createToolAdmin,
+  bulkUpdateClientsAdmin,
+  addOSNoteAdmin,
+  getBudgetPendingSummaryAdmin,
+  settleReceivableAdmin,
+  addObservationAdmin,
+  searchObservationsAdmin,
+  scheduleMessageAdmin,
+  searchTeamMemberAdmin,
+  createTeamMemberAdmin,
+  createNotaFiscalAdmin,
+  addFotoOSAdmin,
+  processPaymentReceiptAdmin,
+  getCompanyAiSettingsAdmin,
+  editQuoteItemsAdmin,
+  addVehicleNoteAdmin
 } from '@/lib/firebase/admin-db';
 import { firestore } from '@/lib/firebase/admin';
 import { sendWhatsappMessage } from '@/lib/whatsapp/evolution-client';
@@ -233,9 +234,9 @@ const tools = [
           clientId: { type: 'string', description: 'ID do cliente (obtido via get_client_details).' },
           clientName: { type: 'string', description: 'Nome do cliente.' },
           serviceType: { type: 'string', enum: ['Instalação', 'Manutenção', 'Comodato', 'Outros'], description: 'Tipo de serviço.' },
-          items: { 
-            type: 'array', 
-            items: { 
+          items: {
+            type: 'array',
+            items: {
               type: 'object',
               properties: {
                 product: {
@@ -453,341 +454,356 @@ const tools = [
       }
     }
   },
-    {
-      type: 'function',
-      function: {
-        name: 'fill_fence_form',
-        description: 'Preenche o formulário técnico de cerca elétrica na tela com os parâmetros extraídos.',
-        parameters: {
-          type: 'object',
-          properties: {
-            clientId: { type: 'string' },
-            clienteNome: { type: 'string' },
-            shape: { type: 'string', enum: ['linear', 'l-shape', 'u-shape', 'quadrilateral'] },
-            isNewQuote: { type: 'boolean', description: 'Defina como true para limpar o formulário e criar um NOVO orçamento (evita sobrescrever orçamentos antigos).' },
-            dimensions: { 
-                type: 'object',
-                properties: {
-                    linear_length: { type: 'number' },
-                    l_sideA: { type: 'number' },
-                    l_sideB: { type: 'number' },
-                    u_sideA: { type: 'number' },
-                    u_sideB: { type: 'number' },
-                    u_sideC: { type: 'number' },
-                }
-            },
-            centralDescricao: { type: 'string' },
-            rodType: { type: 'string', enum: ['23x23', '25x25', '28x28', '30x30'] },
-            installationType: { type: 'string', enum: ['chumbada', 'parafusada'] },
-            voltage: { type: 'string', enum: ['127v', '220v'] },
-            hasSteps: { type: 'boolean' },
-            numberOfSteps: { type: 'number' },
-            highVoltageCableLength: { type: 'number' },
-            parallelWireLength: { type: 'number' },
-            groundingWireLength: { type: 'number' },
-            sirenCableLength: { type: 'number' },
-            installments: { type: 'number', description: 'Número de parcelas (1 para à vista).' },
-            interestRate: { type: 'number', description: 'Taxa de juros mensal (opcional).' }
-          },
-          required: ['shape', 'dimensions']
-        }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'save_fence_quote',
-        description: 'Calcula, preenche e salva o orçamento de cerca elétrica no sistema de ponta a ponta. Use sempre que o usuário pedir para criar, fazer ou enviar um orçamento de cerca elétrica.',
-        parameters: {
-          type: 'object',
-          properties: {
-            clientId: { type: 'string', description: 'Nome ou Código do Cliente (ex: "Elias Schuindt Peixoto").' },
-            clientEmail: { type: 'string', description: 'E-mail do cliente para envio do PDF (ex: "elias.speixoto@gmail.com").' },
-            shape: { type: 'string', enum: ['linear', 'l-shape', 'u-shape', 'quadrilateral'] },
-            dimensions: {
-                type: 'object',
-                properties: {
-                    linear_length: { type: 'number' },
-                    l_sideA: { type: 'number' },
-                    l_sideB: { type: 'number' },
-                    u_sideA: { type: 'number' },
-                    u_sideB: { type: 'number' },
-                    u_sideC: { type: 'number' },
-                }
-            },
-            centralDescricao: { type: 'string' },
-            rodType: { type: 'string', enum: ['23x23', '25x25', '28x28', '30x30'] },
-            installationType: { type: 'string', enum: ['chumbada', 'parafusada'] },
-            voltage: { type: 'string', enum: ['127v', '220v'] },
-            hasSteps: { type: 'boolean' },
-            numberOfSteps: { type: 'number' },
-            highVoltageCableLength: { type: 'number' },
-            parallelWireLength: { type: 'number' },
-            groundingWireLength: { type: 'number' },
-            sirenCableLength: { type: 'number' },
-            installments: { type: 'number', description: 'Número de parcelas (1 para à vista).' },
-            interestRate: { type: 'number', description: 'Taxa de juros mensal (opcional).' }
-          },
-          required: ['shape', 'dimensions']
-        }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'search_technical_info',
-        description: 'Consulta manuais técnicos, datasheets e guias de fabricantes (Rossi, JFL, Intelbras, PPA) para obter especificações precisas, esquemas de ligação e diagnóstico.',
-        parameters: {
-          type: 'object',
-          properties: {
-            query: { type: 'string', description: 'O que buscar (ex: capacitor motor rossi 1/4hp)' },
-            brand: { type: 'string', description: 'Marca do equipamento' },
-            model: { type: 'string', description: 'Modelo do equipamento' }
-          },
-          required: ['query']
-        }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'bulk_update_clients',
-        description: 'Atualiza múltiplos clientes de uma só vez a partir de uma lista ou tabela enviada pelo usuário. Útil para reajustes de contratos comodato, mudanças de status em massa ou correções cadastrais em grupo.',
-        parameters: {
-          type: 'object',
-          properties: {
-            updates: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  term: { type: 'string', description: 'Nome ou Código do cliente para identificar qual será atualizado.' },
-                  data: { type: 'object', description: 'Objeto com os campos a serem alterados (ex: { isComodato: true, serviceValue: 500 }).' }
-                },
-                required: ['term', 'data']
-              }
+  {
+    type: 'function',
+    function: {
+      name: 'fill_fence_form',
+      description: 'Preenche o formulário técnico de cerca elétrica na tela com os parâmetros extraídos.',
+      parameters: {
+        type: 'object',
+        properties: {
+          clientId: { type: 'string' },
+          clienteNome: { type: 'string' },
+          shape: { type: 'string', enum: ['linear', 'l-shape', 'u-shape', 'quadrilateral'] },
+          isNewQuote: { type: 'boolean', description: 'Defina como true para limpar o formulário e criar um NOVO orçamento (evita sobrescrever orçamentos antigos).' },
+          dimensions: {
+            type: 'object',
+            properties: {
+              linear_length: { type: 'number' },
+              l_sideA: { type: 'number' },
+              l_sideB: { type: 'number' },
+              u_sideA: { type: 'number' },
+              u_sideB: { type: 'number' },
+              u_sideC: { type: 'number' },
             }
           },
-          required: ['updates']
-        }
+          centralDescricao: { type: 'string' },
+          rodType: { type: 'string', enum: ['23x23', '25x25', '28x28', '30x30'] },
+          installationType: { type: 'string', enum: ['chumbada', 'parafusada'] },
+          voltage: { type: 'string', enum: ['127v', '220v'] },
+          hasSteps: { type: 'boolean' },
+          numberOfSteps: { type: 'number' },
+          highVoltageCableLength: { type: 'number' },
+          parallelWireLength: { type: 'number' },
+          groundingWireLength: { type: 'number' },
+          sirenCableLength: { type: 'number' },
+          installments: { type: 'number', description: 'Número de parcelas (1 para à vista).' },
+          interestRate: { type: 'number', description: 'Taxa de juros mensal (opcional).' }
+        },
+        required: ['shape', 'dimensions']
       }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'send_whatsapp_message',
-        description: 'Envia uma mensagem de WhatsApp real para um funcionário, cliente ou contato da empresa.',
-        parameters: {
-          type: 'object',
-          properties: {
-            recipientName: { type: 'string', description: 'Nome da pessoa/destinatário (ex: "Veridiana", "Danilo", "Elias" ou nome do cliente).' },
-            phone: { type: 'string', description: 'Número de telefone do destinatário se souber. Se não informado, a NORA buscará o telefone no cadastro.' },
-            messageText: { type: 'string', description: 'O texto/mensagem exato a ser enviado para a pessoa via WhatsApp.' }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'save_fence_quote',
+      description: 'Calcula, preenche e salva o orçamento de cerca elétrica no sistema de ponta a ponta. Use sempre que o usuário pedir para criar, fazer ou enviar um orçamento de cerca elétrica.',
+      parameters: {
+        type: 'object',
+        properties: {
+          clientId: { type: 'string', description: 'Nome ou Código do Cliente (ex: "Elias Schuindt Peixoto").' },
+          clientEmail: { type: 'string', description: 'E-mail do cliente para envio do PDF (ex: "elias.speixoto@gmail.com").' },
+          shape: { type: 'string', enum: ['linear', 'l-shape', 'u-shape', 'quadrilateral'] },
+          dimensions: {
+            type: 'object',
+            properties: {
+              linear_length: { type: 'number' },
+              l_sideA: { type: 'number' },
+              l_sideB: { type: 'number' },
+              u_sideA: { type: 'number' },
+              u_sideB: { type: 'number' },
+              u_sideC: { type: 'number' },
+            }
           },
-          required: ['recipientName', 'messageText']
-        }
+          centralDescricao: { type: 'string' },
+          rodType: { type: 'string', enum: ['23x23', '25x25', '28x28', '30x30'] },
+          installationType: { type: 'string', enum: ['chumbada', 'parafusada'] },
+          voltage: { type: 'string', enum: ['127v', '220v'] },
+          hasSteps: { type: 'boolean' },
+          numberOfSteps: { type: 'number' },
+          highVoltageCableLength: { type: 'number' },
+          parallelWireLength: { type: 'number' },
+          groundingWireLength: { type: 'number' },
+          sirenCableLength: { type: 'number' },
+          installments: { type: 'number', description: 'Número de parcelas (1 para à vista).' },
+          interestRate: { type: 'number', description: 'Taxa de juros mensal (opcional).' }
+        },
+        required: ['shape', 'dimensions']
       }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'send_email',
-        description: 'Dispara um e-mail real via Gmail API contendo orçamento, relatório, proposta ou mensagem para o cliente, diretor ou funcionário. Use sempre que o usuário pedir para enviar e-mail.',
-        parameters: {
-          type: 'object',
-          properties: {
-            to: { type: 'string', description: 'Endereço de e-mail do destinatário (ex: "elias.speixoto@gmail.com").' },
-            subject: { type: 'string', description: 'Assunto do e-mail (ex: "Orçamento Cerca Elétrica - ESP-TEC").' },
-            messageText: { type: 'string', description: 'Conteúdo/corpo do e-mail detalhado em texto formatado.' },
-            quoteNumber: { type: 'string', description: 'Número do orçamento relacionado (se houver, ex: "ORC-0145/26").' },
-            pdfUrl: { type: 'string', description: 'Link do PDF ou proposta pública se aplicável.' }
-          },
-          required: ['to', 'subject', 'messageText']
-        }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_technical_info',
+      description: 'Consulta manuais técnicos, datasheets e guias de fabricantes (Rossi, JFL, Intelbras, PPA) para obter especificações precisas, esquemas de ligação e diagnóstico.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'O que buscar (ex: capacitor motor rossi 1/4hp)' },
+          brand: { type: 'string', description: 'Marca do equipamento' },
+          model: { type: 'string', description: 'Modelo do equipamento' }
+        },
+        required: ['query']
       }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'settle_receivable',
-        description: 'Dá baixa / marca como Pago em uma ou mais contas a receber do financeiro pelo nome do cliente (ex: "Fabio Fontes"), pelo número da OS/Orçamento (ex: "ORC-0122/26") ou pelo ID da fatura.',
-        parameters: {
-          type: 'object',
-          properties: {
-            clientName: { type: 'string', description: 'Nome do cliente para dar baixa nas contas pendentes (ex: "Fabio Fontes").' },
-            quoteNumber: { type: 'string', description: 'Número do Orçamento ou OS vinculada (ex: "ORC-0122/26" ou "0141").' },
-            receivableId: { type: 'string', description: 'ID direto da fatura no Contas a Receber se souber.' },
-            paymentDate: { type: 'string', description: 'Data do pagamento (YYYY-MM-DD). Opcional.' }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'bulk_update_clients',
+      description: 'Atualiza múltiplos clientes de uma só vez a partir de uma lista ou tabela enviada pelo usuário. Útil para reajustes de contratos comodato, mudanças de status em massa ou correções cadastrais em grupo.',
+      parameters: {
+        type: 'object',
+        properties: {
+          updates: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                term: { type: 'string', description: 'Nome ou Código do cliente para identificar qual será atualizado.' },
+                data: { type: 'object', description: 'Objeto com os campos a serem alterados (ex: { isComodato: true, serviceValue: 500 }).' }
+              },
+              required: ['term', 'data']
+            }
           }
-        }
+        },
+        required: ['updates']
       }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'add_os_note',
-        description: 'Registra uma Pendência, Defeito ou Observação diretamente dentro do documento da Ordem de Serviço (OS) ou Orçamento. Use SEMPRE esta ferramenta quando o usuário pedir para registrar ou adicionar uma pendência, defeito ou nota em uma OS.',
-        parameters: {
-          type: 'object',
-          properties: {
-            osCode: { type: 'string', description: 'Número ou código da OS (ex: "OS-0145/26", "145/26", "ORC-0145/26" ou ID da OS).' },
-            type: { type: 'string', enum: ['pendencia', 'defeito', 'observacao'], description: 'Tipo da nota: "pendencia" (tarefas/serviços a fazer), "defeito" (equipamentos ou peças com falha) ou "observacao" (nota geral).' },
-            text: { type: 'string', description: 'Descrição detalhada e clara da pendência, defeito ou observação.' }
-          },
-          required: ['osCode', 'type', 'text']
-        }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'send_whatsapp_message',
+      description: 'Envia uma mensagem de WhatsApp real para um funcionário, cliente ou contato da empresa.',
+      parameters: {
+        type: 'object',
+        properties: {
+          recipientName: { type: 'string', description: 'Nome da pessoa/destinatário (ex: "Veridiana", "Danilo", "Elias" ou nome do cliente).' },
+          phone: { type: 'string', description: 'Número de telefone do destinatário se souber. Se não informado, a NORA buscará o telefone no cadastro.' },
+          messageText: { type: 'string', description: 'O texto/mensagem exato a ser enviado para a pessoa via WhatsApp.' }
+        },
+        required: ['recipientName', 'messageText']
       }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'add_observation',
-        description: 'Adiciona uma nota ou observação global vinculada a uma ou mais palavras-chave (tags), como o nome de um cliente, placa de veículo, número de OS, ou modelo de equipamento.',
-        parameters: {
-          type: 'object',
-          properties: {
-            tags: { type: 'array', items: { type: 'string' }, description: 'Lista de palavras-chave para encontrar esta nota depois (ex: ["BT 019", "Caminhão", "João"]).' },
-            text: { type: 'string', description: 'O texto da observação que deve ser lembrado.' },
-            scope: { type: 'string', enum: ['local', 'global'], description: 'Se "global", a regra é universal e beneficia todas as empresas sem vazar dados. Se "local", é específica da empresa atual.' }
-          },
-          required: ['tags', 'text']
-        }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'send_email',
+      description: 'Dispara um e-mail real via Gmail API contendo orçamento, relatório, proposta ou mensagem para o cliente, diretor ou funcionário. Use sempre que o usuário pedir para enviar e-mail.',
+      parameters: {
+        type: 'object',
+        properties: {
+          to: { type: 'string', description: 'Endereço de e-mail do destinatário (ex: "elias.speixoto@gmail.com").' },
+          subject: { type: 'string', description: 'Assunto do e-mail (ex: "Orçamento Cerca Elétrica - ESP-TEC").' },
+          messageText: { type: 'string', description: 'Conteúdo/corpo do e-mail detalhado em texto formatado.' },
+          quoteNumber: { type: 'string', description: 'Número do orçamento relacionado (se houver, ex: "ORC-0145/26").' },
+          pdfUrl: { type: 'string', description: 'Link do PDF ou proposta pública se aplicável.' }
+        },
+        required: ['to', 'subject', 'messageText']
       }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'search_observations',
-        description: 'Busca observações ou notas globais salvas anteriormente usando palavras-chave (tags).',
-        parameters: {
-          type: 'object',
-          properties: {
-            tags: { type: 'array', items: { type: 'string' }, description: 'Palavras-chave para buscar (ex: ["BT 019"]).' }
-          },
-          required: ['tags']
-        }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'schedule_message',
-        description: 'Agenda o envio de uma mensagem pelo WhatsApp para uma data e hora futura. O sistema disparará automaticamente quando chegar a hora.',
-        parameters: {
-          type: 'object',
-          properties: {
-            recipientName: { type: 'string', description: 'Nome da pessoa/destinatário (ex: "Elias").' },
-            phone: { type: 'string', description: 'Número de telefone do destinatário se souber. Se não informado, a NORA buscará o telefone no cadastro.' },
-            messageText: { type: 'string', description: 'Texto exato da mensagem a ser enviada no futuro.' },
-            scheduledAt: { type: 'string', description: 'Data e hora do agendamento no formato ISO 8601 completo (ex: "2026-08-13T19:22:00-03:00"). Use sempre o fuso horário atual e certifique-se de que é futuro.' }
-          },
-          required: ['recipientName', 'messageText', 'scheduledAt']
-        }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'check_scheduled_messages',
-        description: 'Verifica o status das mensagens agendadas (pendentes ou enviadas) para auditar se o envio futuro já ocorreu.',
-        parameters: { type: 'object', properties: {} }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'cadastrar_nota_fiscal',
-        description: 'Cadastra uma nota fiscal extraída via OCR da imagem. Recebe todos os detalhes e cadastra no status "Pendente de Conferência".',
-        parameters: {
-          type: 'object',
-          properties: {
-            numero: { type: 'string', description: 'Número da nota' },
-            serie: { type: 'string' },
-            dataEmissao: { type: 'string' },
-            fornecedor: { type: 'string', description: 'Nome e CNPJ do fornecedor' },
-            valorTotal: { type: 'string' },
-            itens: { 
-              type: 'array', 
-              items: { type: 'object', properties: { descricao: { type: 'string' }, codigo: { type: 'string' }, quantidade: { type: 'string' }, valorUnitario: { type: 'string' }, valorTotal: { type: 'string' } } }
-            },
-            arquivoUrl: { type: 'string', description: 'URL da imagem/arquivo da nota recebido' }
-          },
-          required: ['fornecedor', 'valorTotal', 'arquivoUrl']
-        }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'anexar_foto_os',
-        description: 'Anexa uma foto a uma Ordem de Serviço ou orçamento existente.',
-        parameters: {
-          type: 'object',
-          properties: {
-            osId: { type: 'string', description: 'ID da O.S. ou Orçamento' },
-            url: { type: 'string', description: 'URL da foto' },
-            descricao: { type: 'string', description: 'Breve descrição da foto' }
-          },
-          required: ['osId', 'url']
-        }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'process_payment_receipt',
-        description: 'Recebe os dados extraídos de um comprovante de pagamento (PIX, TED, Boleto) enviado pelo cliente/usuário e dá baixa na fatura do Contas a Receber.',
-        parameters: {
-          type: 'object',
-          properties: {
-            value: { type: 'string', description: 'Valor pago (ex: 150.00)' },
-            payerName: { type: 'string', description: 'Nome de quem pagou' },
-            date: { type: 'string', description: 'Data do pagamento' }
-          },
-          required: ['value']
-        }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'edit_quote_items',
-        description: 'Adiciona, altera ou remove itens de um orçamento existente. ATENÇÃO: Você só pode passar a quantidade e a descrição dos itens. Os preços serão automaticamente fixados pela tabela oficial do sistema. Você NÃO pode definir ou alterar o preço de custo nem o preço de venda.',
-        parameters: {
-          type: 'object',
-          properties: {
-            quoteId: { type: 'string', description: 'O ID do Orçamento/OS' },
-            items: { 
-                type: 'array', 
-                description: 'A lista completa e atualizada de itens do orçamento. Você deve passar a lista inteira, substituindo a anterior.',
-                items: {
-                    type: 'object',
-                    properties: {
-                        name: { type: 'string', description: 'Nome/Descrição do item' },
-                        quantity: { type: 'number', description: 'Quantidade desejada' }
-                    },
-                    required: ['name', 'quantity']
-                }
-            }
-          },
-          required: ['quoteId', 'items']
-        }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'get_budget_pending_summary',
-        description: 'Varre todas as Ordens de Serviço (e sub-OS vinculadas por caminhão/unidade/placa) de um determinado Orçamento (ex: 0145/26), trazendo o total concluído, o que falta fazer, o cronograma/previsão e todas as observações/relatórios técnicos de campo registrados.',
-        parameters: {
-          type: 'object',
-          properties: {
-            budgetCode: { type: 'string', description: 'Número do Orçamento ou O.S. (ex: "0145/26", "ORC 0145/26", "0145")' }
-          },
-          required: ['budgetCode']
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'settle_receivable',
+      description: 'Dá baixa / marca como Pago em uma ou mais contas a receber do financeiro pelo nome do cliente (ex: "Fabio Fontes"), pelo número da OS/Orçamento (ex: "ORC-0122/26") ou pelo ID da fatura.',
+      parameters: {
+        type: 'object',
+        properties: {
+          clientName: { type: 'string', description: 'Nome do cliente para dar baixa nas contas pendentes (ex: "Fabio Fontes").' },
+          quoteNumber: { type: 'string', description: 'Número do Orçamento ou OS vinculada (ex: "ORC-0122/26" ou "0141").' },
+          receivableId: { type: 'string', description: 'ID direto da fatura no Contas a Receber se souber.' },
+          paymentDate: { type: 'string', description: 'Data do pagamento (YYYY-MM-DD). Opcional.' }
         }
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_os_note',
+      description: 'Registra uma Pendência, Defeito ou Observação diretamente dentro do documento da Ordem de Serviço (OS) ou Orçamento. Use SEMPRE esta ferramenta quando o usuário pedir para registrar ou adicionar uma pendência, defeito ou nota em uma OS.',
+      parameters: {
+        type: 'object',
+        properties: {
+          osCode: { type: 'string', description: 'Número ou código da OS (ex: "OS-0145/26", "145/26", "ORC-0145/26" ou ID da OS).' },
+          type: { type: 'string', enum: ['pendencia', 'defeito', 'observacao'], description: 'Tipo da nota: "pendencia" (tarefas/serviços a fazer), "defeito" (equipamentos ou peças com falha) ou "observacao" (nota geral).' },
+          text: { type: 'string', description: 'Descrição detalhada e clara da pendência, defeito ou observação.' }
+        },
+        required: ['osCode', 'type', 'text']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_observation',
+      description: 'Adiciona uma nota ou observação global vinculada a uma ou mais palavras-chave (tags), como o nome de um cliente, placa de veículo, número de OS, ou modelo de equipamento.',
+      parameters: {
+        type: 'object',
+        properties: {
+          tags: { type: 'array', items: { type: 'string' }, description: 'Lista de palavras-chave para encontrar esta nota depois (ex: ["BT 019", "Caminhão", "João"]).' },
+          text: { type: 'string', description: 'O texto da observação que deve ser lembrado.' },
+          scope: { type: 'string', enum: ['local', 'global'], description: 'Se "global", a regra é universal e beneficia todas as empresas sem vazar dados. Se "local", é específica da empresa atual.' }
+        },
+        required: ['tags', 'text']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_observations',
+      description: 'Busca observações ou notas globais salvas anteriormente usando palavras-chave (tags).',
+      parameters: {
+        type: 'object',
+        properties: {
+          tags: { type: 'array', items: { type: 'string' }, description: 'Palavras-chave para buscar (ex: ["BT 019"]).' }
+        },
+        required: ['tags']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'schedule_message',
+      description: 'Agenda o envio de uma mensagem pelo WhatsApp para uma data e hora futura. O sistema disparará automaticamente quando chegar a hora.',
+      parameters: {
+        type: 'object',
+        properties: {
+          recipientName: { type: 'string', description: 'Nome da pessoa/destinatário (ex: "Elias").' },
+          phone: { type: 'string', description: 'Número de telefone do destinatário se souber. Se não informado, a NORA buscará o telefone no cadastro.' },
+          messageText: { type: 'string', description: 'Texto exato da mensagem a ser enviada no futuro.' },
+          scheduledAt: { type: 'string', description: 'Data e hora do agendamento no formato ISO 8601 completo (ex: "2026-08-13T19:22:00-03:00"). Use sempre o fuso horário atual e certifique-se de que é futuro.' }
+        },
+        required: ['recipientName', 'messageText', 'scheduledAt']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'check_scheduled_messages',
+      description: 'Verifica o status das mensagens agendadas (pendentes ou enviadas) para auditar se o envio futuro já ocorreu.',
+      parameters: { type: 'object', properties: {} }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'cadastrar_nota_fiscal',
+      description: 'Cadastra uma nota fiscal extraída via OCR da imagem. Recebe todos os detalhes e cadastra no status "Pendente de Conferência".',
+      parameters: {
+        type: 'object',
+        properties: {
+          numero: { type: 'string', description: 'Número da nota' },
+          serie: { type: 'string' },
+          dataEmissao: { type: 'string' },
+          fornecedor: { type: 'string', description: 'Nome e CNPJ do fornecedor' },
+          valorTotal: { type: 'string' },
+          itens: {
+            type: 'array',
+            items: { type: 'object', properties: { descricao: { type: 'string' }, codigo: { type: 'string' }, quantidade: { type: 'string' }, valorUnitario: { type: 'string' }, valorTotal: { type: 'string' } } }
+          },
+          arquivoUrl: { type: 'string', description: 'URL da imagem/arquivo da nota recebido' }
+        },
+        required: ['fornecedor', 'valorTotal', 'arquivoUrl']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'anexar_foto_os',
+      description: 'Anexa uma foto a uma Ordem de Serviço ou orçamento existente.',
+      parameters: {
+        type: 'object',
+        properties: {
+          osId: { type: 'string', description: 'ID da O.S. ou Orçamento' },
+          url: { type: 'string', description: 'URL da foto' },
+          descricao: { type: 'string', description: 'Breve descrição da foto' }
+        },
+        required: ['osId', 'url']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'process_payment_receipt',
+      description: 'Recebe os dados extraídos de um comprovante de pagamento (PIX, TED, Boleto) enviado pelo cliente/usuário e dá baixa na fatura do Contas a Receber.',
+      parameters: {
+        type: 'object',
+        properties: {
+          value: { type: 'string', description: 'Valor pago (ex: 150.00)' },
+          payerName: { type: 'string', description: 'Nome de quem pagou' },
+          date: { type: 'string', description: 'Data do pagamento' }
+        },
+        required: ['value']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'edit_quote_items',
+      description: 'Adiciona, altera ou remove itens de um orçamento existente. ATENÇÃO: Você só pode passar a quantidade e a descrição dos itens. Os preços serão automaticamente fixados pela tabela oficial do sistema. Você NÃO pode definir ou alterar o preço de custo nem o preço de venda.',
+      parameters: {
+        type: 'object',
+        properties: {
+          quoteId: { type: 'string', description: 'O ID do Orçamento/OS' },
+          items: {
+            type: 'array',
+            description: 'A lista completa e atualizada de itens do orçamento. Você deve passar a lista inteira, substituindo a anterior.',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'Nome/Descrição do item' },
+                quantity: { type: 'number', description: 'Quantidade desejada' }
+              },
+              required: ['name', 'quantity']
+            }
+          }
+        },
+        required: ['quoteId', 'items']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_budget_pending_summary',
+      description: 'Varre todas as Ordens de Serviço (e sub-OS vinculadas por caminhão/unidade/placa) de um determinado Orçamento (ex: 0145/26), trazendo o total concluído, o que falta fazer, o cronograma/previsão e todas as observações/relatórios técnicos de campo registrados.',
+      parameters: {
+        type: 'object',
+        properties: {
+          budgetCode: { type: 'string', description: 'Número do Orçamento ou O.S. (ex: "0145/26", "ORC 0145/26", "0145")' }
+        },
+        required: ['budgetCode']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_vehicle_note',
+      description: 'Adiciona uma anotação, histórico de manutenção, troca de pneus, troca de óleo, revisão ou observação diretamente no campo "Observações e Manutenção" do cadastro do veículo (na aba Veículos). Use SEMPRE que o usuário pedir para registrar ou adicionar observação em um veículo ou na manutenção de um carro/moto/caminhão da frota.',
+      parameters: {
+        type: 'object',
+        properties: {
+          vehicleTerm: { type: 'string', description: 'Placa ou Modelo do veículo (ex: "HKH 2180", "Montana", "DR 160", "Fusca").' },
+          text: { type: 'string', description: 'O texto da observação ou manutenção a ser registrado (ex: "[03/08/2026] Troca de par de pneus dianteiros").' }
+        },
+        required: ['vehicleTerm', 'text']
+      }
+    }
+  }
 ];
 
 async function executeTool(toolCall: any, context: any) {
@@ -795,9 +811,9 @@ async function executeTool(toolCall: any, context: any) {
   const technicianId = role === 'tecnico' ? uid : undefined;
   const isClient = role === 'cliente';
   const name = toolCall.function.name;
-  
-  const args = typeof toolCall.function.arguments === 'string' 
-    ? JSON.parse(toolCall.function.arguments) 
+
+  const args = typeof toolCall.function.arguments === 'string'
+    ? JSON.parse(toolCall.function.arguments)
     : toolCall.function.arguments;
 
   try {
@@ -873,12 +889,12 @@ async function executeTool(toolCall: any, context: any) {
         return await getDetailedListAdmin(companyId, args.collection, args.status, technicianId, isClient ? clientId : undefined);
 
       case 'get_client_details':
-        if (isClient) return await searchClientByCodeOrNameAdmin(companyId, clientId || ""); 
+        if (isClient) return await searchClientByCodeOrNameAdmin(companyId, clientId || "");
         return await searchClientByCodeOrNameAdmin(companyId, args.term);
-        
+
       case 'get_team_member_details':
         return await searchTeamMemberAdmin(companyId, args.term);
-        
+
       case 'get_location_status':
         if (isClient) return { error: 'A localização da equipe é para uso operacional interno. Caso precise de suporte no local, podemos agendar uma visita para você.' };
         return await getOnlineTeamAdmin(companyId);
@@ -900,7 +916,7 @@ async function executeTool(toolCall: any, context: any) {
       case 'search_products':
         const allProds = await getProductsAdmin(companyId);
         const searchStr = (args.term || "").toLowerCase();
-        
+
         const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
         const targetNormalized = normalize(searchStr);
 
@@ -917,63 +933,63 @@ async function executeTool(toolCall: any, context: any) {
             ${p.name || ''} 
             ${p.title || ''}
         `);
-        
+
         let filtered = allProds.filter((p: any) => {
-            const text = getFullProductText(p);
-            return text.includes(targetNormalized);
+          const text = getFullProductText(p);
+          return text.includes(targetNormalized);
         });
 
         // Se não achou nada com a string inteira, tenta quebrar em termos (AND logic)
         if (filtered.length === 0) {
-            const commonCategoryWords = ['central', 'choque', 'jfl', 'intelbras', 'eletrificador', 'cerca', 'eletrica', 'produto', 'camera', 'mini'];
-            const terms = searchStr.split(' ').map((t: string) => normalize(t)).filter((t: string) => t.length > 1);
-            
-            if (terms.length > 0) {
-                // Primeira tentativa: todos os termos
+          const commonCategoryWords = ['central', 'choque', 'jfl', 'intelbras', 'eletrificador', 'cerca', 'eletrica', 'produto', 'camera', 'mini'];
+          const terms = searchStr.split(' ').map((t: string) => normalize(t)).filter((t: string) => t.length > 1);
+
+          if (terms.length > 0) {
+            // Primeira tentativa: todos os termos
+            filtered = allProds.filter((p: any) => {
+              const text = getFullProductText(p);
+              return terms.every((t: string) => text.includes(t));
+            });
+
+            // Segunda tentativa: se não achou nada, remove palavras de categoria e tenta de novo (prioriza modelo)
+            if (filtered.length === 0) {
+              const modelTerms = terms.filter((t: string) => !commonCategoryWords.includes(t));
+              if (modelTerms.length > 0) {
                 filtered = allProds.filter((p: any) => {
-                    const text = getFullProductText(p);
-                    return terms.every((t: string) => text.includes(t));
+                  const text = getFullProductText(p);
+                  return modelTerms.every((t: string) => text.includes(t));
                 });
-                
-                // Segunda tentativa: se não achou nada, remove palavras de categoria e tenta de novo (prioriza modelo)
-                if (filtered.length === 0) {
-                    const modelTerms = terms.filter((t: string) => !commonCategoryWords.includes(t));
-                    if (modelTerms.length > 0) {
-                        filtered = allProds.filter((p: any) => {
-                            const text = getFullProductText(p);
-                            return modelTerms.every((t: string) => text.includes(t));
-                        });
-                    }
-                }
+              }
             }
+          }
         }
 
         return filtered.slice(0, 15).map((p: any) => ({
-            id: p.id,
-            description: p.description || p.detailedDescription || p.name || p.title || 'Produto sem descrição',
-            detailedDescription: p.detailedDescription || '',
-            item: p.item || p.ean || p.code || p.codigoBarras || p.codigo || '',
-            sellingPrice: p.sellingPrice || 0,
-            materialPrice: p.materialPrice || 0,
-            unit: p.unit || 'UNID',
-            stockQuantity: p.stockQuantity || 0,
-            distributor: p.distributor || p.DISTRIBUIDOR || p.fornecedor || '',
-            manufacturer: p.manufacturer || p.marca || '',
-            model: p.model || ''
+          id: p.id,
+          description: p.description || p.detailedDescription || p.name || p.title || 'Produto sem descrição',
+          detailedDescription: p.detailedDescription || '',
+          item: p.item || p.ean || p.code || p.codigoBarras || p.codigo || '',
+          sellingPrice: p.sellingPrice || 0,
+          materialPrice: p.materialPrice || 0,
+          unit: p.unit || 'UNID',
+          stockQuantity: p.stockQuantity || 0,
+          distributor: p.distributor || p.DISTRIBUIDOR || p.fornecedor || '',
+          manufacturer: p.manufacturer || p.marca || '',
+          model: p.model || ''
         }));
 
 
 
       case 'create_quote':
         if (args.serviceType === 'Cerca Elétrica' || (args.items && JSON.stringify(args.items).toLowerCase().includes('cerca'))) {
-            return { error: 'ERRO: Para orçamentos de Cerca Elétrica, você é PROIBIDA de usar a ferramenta create_quote. Use obrigatoriamente a ferramenta fill_fence_form para preencher os parâmetros na tela e depois save_fence_quote.' };
+          return { error: 'ERRO: Para orçamentos de Cerca Elétrica, você é PROIBIDA de usar a ferramenta create_quote. Use obrigatoriamente a ferramenta fill_fence_form para preencher os parâmetros na tela e depois save_fence_quote.' };
         }
 
         if (!args.clientId || !args.clientName || args.clientName === '-' || args.clientName === 'N/A') {
-           return { error: 'ERRO: clientName inválido ou ausente. Você DEVE primeiro buscar o cliente real com get_client_details e passar o NOME REAL dele para esta ferramenta.' };
+          return { error: 'ERRO: clientName inválido ou ausente. Você DEVE primeiro buscar o cliente real com get_client_details e passar o NOME REAL dele para esta ferramenta.' };
         }
-        
-        
+
+
         // Padronização de Itens e Validação Anti-Hallucinação
         if (args.items && Array.isArray(args.items)) {
           const zeroPriceItems: string[] = [];
@@ -985,10 +1001,10 @@ async function executeTool(toolCall: any, context: any) {
             const mPrice = item.materialPrice ?? item.price ?? item.sellingPrice ?? product.sellingPrice ?? product.price ?? 0;
             const sPrice = item.servicePrice ?? product.servicePrice ?? 0;
             const qty = item.quantity || 1;
-            
+
             if (mPrice === 0 && sPrice === 0) zeroPriceItems.push(product.description);
             if (!product.item || product.item === '-' || product.item === '0' || product.item.toLowerCase() === 'n/a') {
-                fakeCodeItems.push(product.description);
+              fakeCodeItems.push(product.description);
             }
 
             return {
@@ -1006,11 +1022,11 @@ async function executeTool(toolCall: any, context: any) {
           });
 
           if (zeroPriceItems.length > 0) {
-              return { error: `ERRO DE VALIDAÇÃO: Os itens [${zeroPriceItems.join(', ')}] estão com preço zero. A NORA não pode salvar orçamentos sem valores. Por favor, pergunte o preço ao usuário ou use search_products para achar o item correto.` };
+            return { error: `ERRO DE VALIDAÇÃO: Os itens [${zeroPriceItems.join(', ')}] estão com preço zero. A NORA não pode salvar orçamentos sem valores. Por favor, pergunte o preço ao usuário ou use search_products para achar o item correto.` };
           }
 
           if (fakeCodeItems.length > 0) {
-              return { error: `ERRO DE INTEGRIDADE: Os itens [${fakeCodeItems.join(', ')}] estão com códigos inválidos. Use search_products.` };
+            return { error: `ERRO DE INTEGRIDADE: Os itens [${fakeCodeItems.join(', ')}] estão com códigos inválidos. Use search_products.` };
           }
         }
 
@@ -1021,7 +1037,7 @@ async function executeTool(toolCall: any, context: any) {
       case 'create_client':
         // Se for comodato e a frequência não for informada (ou for 0), definimos o padrão de 4 meses
         if (args.isComodato && (!args.preventiveMaintenanceFrequency || args.preventiveMaintenanceFrequency === 0)) {
-            args.preventiveMaintenanceFrequency = 4;
+          args.preventiveMaintenanceFrequency = 4;
         }
         return await createClientAdmin(companyId, args);
 
@@ -1036,7 +1052,7 @@ async function executeTool(toolCall: any, context: any) {
 
       case 'delete_record':
         if (!args.confirmed) {
-            return { error: 'BLOQUEIO DE SEGURANÇA FISCAL: A exclusão de registros exige confirmação prévia e explícita do usuário. Por favor, pergunte primeiro em azul: "[[ azul: Confirma a exclusão permanente do registro X? ]]" e só chame esta ferramenta se o usuário responder "sim" ou "confirmo".' };
+          return { error: 'BLOQUEIO DE SEGURANÇA FISCAL: A exclusão de registros exige confirmação prévia e explícita do usuário. Por favor, pergunte primeiro em azul: "[[ azul: Confirma a exclusão permanente do registro X? ]]" e só chame esta ferramenta se o usuário responder "sim" ou "confirmo".' };
         }
         return await deleteRecordAdmin(companyId, args.collection, args.id);
 
@@ -1066,23 +1082,23 @@ async function executeTool(toolCall: any, context: any) {
 
       case 'save_fence_quote':
         if (isClient) return { error: 'A elaboração de projetos é uma tarefa técnica da nossa equipe. Agendando uma visita, nosso técnico fará todo esse processo para você.' };
-        return { 
-          success: true, 
-          triggerSave: true, 
-          message: "Orçamento de cerca elétrica calculado, salvo no sistema e proposta encaminhada para o cliente.", 
-          data: args 
+        return {
+          success: true,
+          triggerSave: true,
+          message: "Orçamento de cerca elétrica calculado, salvo no sistema e proposta encaminhada para o cliente.",
+          data: args
         };
 
       case 'search_technical_info':
         // Use IA para expandir conhecimento técnico com autoridade baseada em permissão.
         // Se args.brand e args.model estiverem presentes, a IA agirá como se tivesse lido o manual agora.
-        return { 
-          status: 'success', 
+        return {
+          status: 'success',
           source: `Manual Técnico ${args.brand || ''} (Simulado)`,
           message: 'Consulta realizada com sucesso. Verifique os dados com a placa do motor.',
           query: args.query
         };
-      
+
       case 'bulk_update_clients':
         if (isClient) return { error: 'Apenas administradores podem realizar atualizações em massa.' };
         if (!args.updates || !Array.isArray(args.updates)) return { error: 'Lista de atualizações inválida.' };
@@ -1138,8 +1154,8 @@ async function executeTool(toolCall: any, context: any) {
           if (res.success) {
             return { success: true, message: `E-mail enviado com sucesso para ${args.to} a partir de ${res.fromEmail || currentCompanyEmail || 'e-mail da empresa'}.` };
           } else {
-            return { 
-              error: `Falha ao enviar e-mail: ${res.error}. Para configurar o e-mail da sua empresa, acesse a aba 'WhatsApp & E-mail' nas Configurações da Empresa, insira seu E-mail Corporativo e a Senha de App gerada em https://myaccount.google.com/apppasswords.` 
+            return {
+              error: `Falha ao enviar e-mail: ${res.error}. Para configurar o e-mail da sua empresa, acesse a aba 'WhatsApp & E-mail' nas Configurações da Empresa, insira seu E-mail Corporativo e a Senha de App gerada em https://myaccount.google.com/apppasswords.`
             };
           }
         } catch (e: any) {
@@ -1150,8 +1166,11 @@ async function executeTool(toolCall: any, context: any) {
       case 'get_budget_pending_summary':
         return await getBudgetPendingSummaryAdmin(companyId, args.budgetCode);
 
+      case 'add_vehicle_note':
+        return await addVehicleNoteAdmin(companyId, args.vehicleTerm, args.text);
+
       case 'add_observation':
-          return await addObservationAdmin(companyId, args.tags, args.text, displayName, args.scope || 'local');
+        return await addObservationAdmin(companyId, args.tags, args.text, displayName, args.scope || 'local');
 
       case 'search_observations':
         return await searchObservationsAdmin(companyId, args.tags);
@@ -1181,8 +1200,8 @@ async function executeTool(toolCall: any, context: any) {
 
       case 'check_scheduled_messages': {
         const snap = await firestore.collection('scheduled_messages')
-            .where("companyId", "==", companyId)
-            .get();
+          .where("companyId", "==", companyId)
+          .get();
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
         docs.sort((a, b) => ((b.createdAt || '') > (a.createdAt || '') ? 1 : -1));
         return docs.slice(0, 10);
@@ -1197,7 +1216,7 @@ async function executeTool(toolCall: any, context: any) {
       case 'process_payment_receipt': {
         const aiSettings = await getCompanyAiSettingsAdmin(companyId);
         if (!aiSettings || !aiSettings.finance_active) {
-            return { error: `Módulo Financeiro Autônomo está desativado nas Configurações da Empresa. Informe ao usuário que você leu o comprovante de R$ ${args.value}, mas ele precisa dar a baixa manualmente ou ativar a Autonomia Financeira.` };
+          return { error: `Módulo Financeiro Autônomo está desativado nas Configurações da Empresa. Informe ao usuário que você leu o comprovante de R$ ${args.value}, mas ele precisa dar a baixa manualmente ou ativar a Autonomia Financeira.` };
         }
         return await processPaymentReceiptAdmin(companyId, args);
       }
@@ -1220,7 +1239,7 @@ async function executeTool(toolCall: any, context: any) {
  */
 function sanitizeData(obj: any): any {
   if (obj === null || obj === undefined) return obj;
-  
+
   // Se for um Timestamp do Firestore (ou objeto parecido com _seconds)
   if (obj && typeof obj === 'object' && ('_seconds' in obj || 'seconds' in obj)) {
     try {
@@ -1255,9 +1274,9 @@ function getSystemPrompt(userContext: any): string {
   const { role, displayName, companyName, currentPath } = userContext;
   const rawName = displayName || 'Elias';
   const firstName = (/^\d+$/.test(rawName) || rawName.includes('Cliente')) ? 'Elias' : rawName.split(' ')[0];
-  
+
   const nowStr = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-  
+
   // Base comum para todas as personas
   const commonBase = `Você é a NORA Pro, a Inteligência Artificial da ${companyName}.
 O usuário está na tela (URL) atual: ${currentPath || 'Desconhecida'}. Use isso para dar respostas contextuais.
@@ -1326,7 +1345,10 @@ INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
      * **Formato Retangular / Quadrado / Fechado (4 lados):** Perímetro completo do imóvel/terreno (ex: "terreno 10x30 todo fechado" = 10+30+10+30 = 80m). Use shape: 'quadrilateral', dimensions: { l_sideA: 10, l_sideB: 30 }.
    - **ESCLARECIMENTO DE DÚVIDAS:** Se o usuário disser apenas "terreno 10x30" ou passar medidas ambíguas sem especificar quais lados serão cercados, pergunte de forma objetiva:
      * "[[ azul: A cerca será instalada apenas na frente (10m), em L (frente + 1 lateral), em U (3 lados) ou fechando o terreno completo nos 4 lados? ]]"
-   - **USO OBRIGATÓRIO DA CALCULADORA DE CERCA:** Você DEVE chamar 'save_fence_quote' com os parâmetros calculados para gerar o dimensionamento exato de todas as hastes, isoladores, cabos e central, salvando e gerando o PDF da proposta.
+    - **USO OBRIGATÓRIO DA CALCULADORA DE CERCA:** Você DEVE chamar 'save_fence_quote' com os parâmetros calculados para gerar o dimensionamento exato de todas as hastes, isoladores, cabos e central, salvando e gerando o PDF da proposta.
+11. **REGISTRO DE MANUTENÇÃO E OBSERVAÇÕES DE VEÍCULOS (FROTA):**
+   - Se o usuário pedir para registrar, anotar ou salvar manutenção, troca de peças, óleo, pneus, revisões ou observações em um veículo da frota (ex: "adicione na observação de manutenção da montana hkh 2180 uma troca de par de pneus...", "troca de óleo do fusca"), você DEVE chamar IMEDIATAMENTE a ferramenta \`add_vehicle_note\` informando o modelo/placa do veículo e o texto.
+   - NUNCA use \`add_observation\` para notas de veículos, pois a frota possui campo próprio no cadastro de veículos (\`vehicles\`), que fica visível na aba Veículos da plataforma.
 `;
 
   // Persona 1: CLIENTE (Concierge do Portal)
@@ -1404,7 +1426,7 @@ export async function noraFlow(input: z.infer<typeof NoraFlowInputSchema>): Prom
   const hasDeepSeek = !!process.env.DEEPSEEK_API_KEY;
   const hasProjectId = !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const hasServiceAccount = !!process.env.FIREBASE_SERVICE_ACCOUNT;
-  
+
   if (!hasDeepSeek) console.error('[NORA FLOW] CRITICAL: DEEPSEEK_API_KEY is missing from environment.');
   if (!hasProjectId) console.error('[NORA FLOW] CRITICAL: NEXT_PUBLIC_FIREBASE_PROJECT_ID is missing from environment.');
   if (!hasServiceAccount && process.env.NODE_ENV === 'production') {
@@ -1417,7 +1439,7 @@ export async function noraFlow(input: z.infer<typeof NoraFlowInputSchema>): Prom
 
   try {
     let apiMessages: any[] = [{ role: 'system', content: systemPrompt }, ...messages];
-    
+
     let maxTurns = 5;
     let turn = 0;
     let lastResponseContent = '';
@@ -1426,7 +1448,7 @@ export async function noraFlow(input: z.infer<typeof NoraFlowInputSchema>): Prom
     while (turn < maxTurns) {
       turn++;
       const responseMessage = await callDeepSeek(apiMessages, tools, 0.2);
-      
+
       const toolCalls = responseMessage.tool_calls;
       const content = (responseMessage.content || '');
       const cleanContent = content.replace(/<thought>[\s\S]*?<\/thought>/g, '').trim();
@@ -1436,10 +1458,10 @@ export async function noraFlow(input: z.infer<typeof NoraFlowInputSchema>): Prom
         for (const toolCall of toolCalls) {
           console.log(`[NORA FLOW] EXECUTANDO TOOL: ${toolCall.function.name}`, toolCall.function.arguments);
           const result = await executeTool(toolCall, userContext);
-          
+
           // Capturar ações específicas para a UI
           if (toolCall.function.name === 'fill_fence_form' || toolCall.function.name === 'save_fence_quote') {
-              actions.push({ type: toolCall.function.name, data: JSON.parse(toolCall.function.arguments) });
+            actions.push({ type: toolCall.function.name, data: JSON.parse(toolCall.function.arguments) });
           }
 
           const sanitizedResult = sanitizeData(result);
@@ -1458,9 +1480,9 @@ export async function noraFlow(input: z.infer<typeof NoraFlowInputSchema>): Prom
       // Se chegamos aqui, não há ferramentas nesta resposta
       if (!cleanContent) {
         if (content.includes('<thought>')) {
-           apiMessages.push(responseMessage);
-           apiMessages.push({ role: 'user', content: 'Por favor, apresente agora os dados ou responda de forma direta para o usuário conforme fatiamento de informação e concisão.' });
-           continue;
+          apiMessages.push(responseMessage);
+          apiMessages.push({ role: 'user', content: 'Por favor, apresente agora os dados ou responda de forma direta para o usuário conforme fatiamento de informação e concisão.' });
+          continue;
         }
         return { response: `Busquei as informações, mas não consegui formular uma resposta visível. Pode tentar reformular a pergunta?`, actions };
       }
@@ -1474,11 +1496,11 @@ export async function noraFlow(input: z.infer<typeof NoraFlowInputSchema>): Prom
     console.error("NORA Flow Error:", error);
     const errorMsg = error.message || error.toString();
     const isApiKeyError = errorMsg.includes('API_KEY') || errorMsg.includes('401') || errorMsg.includes('Unauthorized');
-    
+
     if (isApiKeyError) {
       return { response: `🛑 ERRO DE CHAVE: A chave da IA (DeepSeek) não foi encontrada no servidor Live. Verifique o Secret Manager ou as variáveis de ambiente.`, actions: [] };
     }
-    
+
     return { response: `❌ ERRO TÉCNICO: ${errorMsg}\n\n(Tente atualizar a página ou verificar o Secret Manager do Firebase).`, actions: [] };
   }
 }
