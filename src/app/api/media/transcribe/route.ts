@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       const groqModels = ['whisper-large-v3-turbo', 'whisper-large-v3'];
       for (const model of groqModels) {
         try {
-          const audioFile = new File([audioBuffer], 'voice.webm', { type: mimeType });
+          const audioFile = new File([new Uint8Array(audioBuffer)], 'voice.webm', { type: mimeType });
           const groqFormData = new FormData();
           groqFormData.append('file', audioFile);
           groqFormData.append('model', model);

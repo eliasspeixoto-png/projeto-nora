@@ -1,5 +1,5 @@
 import { firestore } from './admin';
-import { isPast, parseISO, startOfMonth } from "date-fns";
+import { isPast, parseISO, startOfMonth, format } from "date-fns";
 import { getBrasiliaDate, getTodayBrasiliaISO, normalizeString } from "@/lib/utils";
 
 const PRODUCTS_COLLECTION = "products";
@@ -831,19 +831,240 @@ export const addVehicleNoteAdmin = async (companyId: string, vehicleTerm: string
         throw new Error(`Veículo não encontrado pelo termo "${vehicleTerm}".`);
     }
 
-    const currentNotes = doc.data().notes ? doc.data().notes.trim() + '\n' : '';
-    const updatedNotes = currentNotes ? `${currentNotes}${noteText}` : noteText;
+    const vData = doc.data();
+    const currentNotes = vData.notes ? vData.notes.trim() : '';
+    const now = getBrasiliaDate();
+    const dateFormatted = format(now, 'yyyy-MM-dd');
+    
+    // Tenta extrair data entre colchetes [DD/MM/AAAA] se existir
+    let itemDate = dateFormatted;
+    const dateMatch = noteText.match(/\[(\d{2})\/(\d{2})\/(\d{4})\]/);
+    if (dateMatch) {
+        itemDate = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+    }
+
+    // Determina status inteligente
+    let status: 'Agendado' | 'Pendente' | 'Concluído' = 'Concluído';
+    const lowerText = noteText.toLowerCase();
+    if (lowerText.includes('agendad') || lowerText.includes('previst') || lowerText.includes('próxim')) {
+        status = 'Agendado';
+    } else if (lowerText.includes('precisa') || lowerText.includes('levar') || lowerText.includes('oficina') || lowerText.includes('defeito') || lowerText.includes('problema')) {
+        status = 'Pendente';
+    }
+
+    const cleanDescription = noteText.replace(/\[.*?\]/g, '').replace(/\(Status:.*?\)/g, '').trim();
+
+    const newItem = {
+        id: `maint_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        description: cleanDescription || noteText,
+        date: itemDate,
+        status,
+        createdAt: now.toISOString(),
+        createdBy: 'NORA AI'
+    };
+
+    const currentList = vData.maintenanceList || [];
+    const updatedList = [newItem, ...currentList].sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+
+    // Insere o registro mais recente no topo (ordem decrescente cronológica)
+    const updatedNotes = currentNotes ? `${noteText}\n${currentNotes}` : noteText;
 
     await doc.ref.update({
+        notes: updatedNotes,
+        maintenanceList: updatedList
+    });
+
+    return {
+        success: true,
+        vehicleId: doc.id,
+        plate: vData.plate,
+        model: vData.model,
+        updatedNotes,
+        item: newItem
+    };
+};
+
+export const addVehicleMaintenanceAdmin = async (
+    companyId: string, 
+    vehicleTerm: string, 
+    data: { 
+        description: string; 
+        date?: string; 
+        expectedReturnDate?: string;
+        status?: 'Agendado' | 'Em Manutenção' | 'Pendente' | 'Concluído'; 
+        cost?: number; 
+        createdBy?: string; 
+        notes?: string; 
+    }
+) => {
+    const snap = await firestore.collection(VEHICLES_COLLECTION).where("companyId", "==", companyId).get();
+    const cleanTerm = vehicleTerm.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    const doc = snap.docs.find(d => {
+        const dData = d.data();
+        const plate = (dData.plate || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const model = (dData.model || '').toLowerCase();
+        const brand = (dData.brand || '').toLowerCase();
+        return plate.includes(cleanTerm) || model.includes(vehicleTerm.toLowerCase()) || cleanTerm.includes(plate);
+    });
+
+    if (!doc) {
+        throw new Error(`Veículo não encontrado pelo termo "${vehicleTerm}".`);
+    }
+
+    const vData = doc.data();
+    const maintenanceList = vData.maintenanceList || [];
+    const now = getBrasiliaDate();
+    const dateFormatted = data.date || format(now, 'yyyy-MM-dd');
+    const status = data.status || 'Agendado';
+
+    const newItem: any = {
+        id: `maint_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        description: data.description,
+        date: dateFormatted,
+        status,
+        createdAt: now.toISOString(),
+        createdBy: data.createdBy || 'NORA AI',
+        cost: data.cost ? Number(data.cost) : 0,
+        notes: data.notes || ''
+    };
+
+    if (data.expectedReturnDate) {
+        newItem.expectedReturnDate = data.expectedReturnDate;
+    }
+    if (status === 'Concluído') {
+        newItem.completedAt = now.toISOString();
+    }
+
+    // Ordenar de forma decrescente por data
+    const updatedList = [newItem, ...maintenanceList].sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+
+    // Sincronizar também no texto de notes para manter retrocompatibilidade
+    const dateBr = dateFormatted.split('-').reverse().join('/');
+    const prevText = data.expectedReturnDate ? ` [Previsão retorno: ${data.expectedReturnDate.split('-').reverse().join('/')}]` : '';
+    const textEntry = `[${dateBr}] ${data.description} (Status: ${status}${prevText})`;
+    const currentNotes = vData.notes ? vData.notes.trim() : '';
+    const updatedNotes = currentNotes ? `${textEntry}\n${currentNotes}` : textEntry;
+
+    await doc.ref.update({
+        maintenanceList: updatedList,
         notes: updatedNotes
     });
 
     return {
         success: true,
         vehicleId: doc.id,
-        plate: doc.data().plate,
-        model: doc.data().model,
-        updatedNotes
+        plate: vData.plate,
+        model: vData.model,
+        item: newItem
+    };
+};
+
+export const getVehicleMaintenancesAdmin = async (
+    companyId: string, 
+    vehicleTerm?: string, 
+    filterStatus?: 'Agendado' | 'Em Manutenção' | 'Pendente' | 'Concluído' | 'all'
+) => {
+    const snap = await firestore.collection(VEHICLES_COLLECTION).where("companyId", "==", companyId).get();
+    let vehicles = snap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(v => !v.deletedAt);
+
+    if (vehicleTerm) {
+        const cleanTerm = vehicleTerm.toLowerCase().replace(/[^a-z0-9]/g, '');
+        vehicles = vehicles.filter(v => {
+            const plate = (v.plate || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const model = (v.model || '').toLowerCase();
+            const brand = (v.brand || '').toLowerCase();
+            return plate.includes(cleanTerm) || model.includes(vehicleTerm.toLowerCase()) || cleanTerm.includes(plate);
+        });
+    }
+
+    const results: any[] = [];
+    for (const v of vehicles) {
+        let mList = v.maintenanceList || [];
+        if (filterStatus && filterStatus !== 'all') {
+            mList = mList.filter((m: any) => m.status?.toLowerCase() === filterStatus.toLowerCase());
+        }
+        if (mList.length > 0) {
+            results.push({
+                vehicleId: v.id,
+                plate: v.plate,
+                model: v.model,
+                brand: v.brand,
+                maintenances: mList
+            });
+        }
+    }
+
+    return results;
+};
+
+export const updateVehicleMaintenanceStatusAdmin = async (
+    companyId: string, 
+    vehicleTerm: string, 
+    descriptionOrId: string, 
+    newStatus: 'Agendado' | 'Em Manutenção' | 'Pendente' | 'Concluído',
+    expectedReturnDate?: string
+) => {
+    const snap = await firestore.collection(VEHICLES_COLLECTION).where("companyId", "==", companyId).get();
+    const cleanTerm = vehicleTerm.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    const doc = snap.docs.find(d => {
+        const dData = d.data();
+        const plate = (dData.plate || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const model = (dData.model || '').toLowerCase();
+        return plate.includes(cleanTerm) || model.includes(vehicleTerm.toLowerCase()) || cleanTerm.includes(plate);
+    });
+
+    if (!doc) {
+        throw new Error(`Veículo não encontrado pelo termo "${vehicleTerm}".`);
+    }
+
+    const vData = doc.data();
+    const maintenanceList = vData.maintenanceList || [];
+    const searchTarget = descriptionOrId.toLowerCase().trim();
+
+    let matchedItem: any = null;
+    const updatedList = maintenanceList.map((m: any) => {
+        if (m.id === descriptionOrId || m.description.toLowerCase().includes(searchTarget)) {
+            matchedItem = {
+                ...m,
+                status: newStatus
+            };
+            if (expectedReturnDate) {
+                matchedItem.expectedReturnDate = expectedReturnDate;
+            }
+            if (newStatus === 'Concluído') {
+                matchedItem.completedAt = getBrasiliaDate().toISOString();
+            } else {
+                delete matchedItem.completedAt;
+            }
+            return matchedItem;
+        }
+        return m;
+    });
+
+    if (!matchedItem) {
+        throw new Error(`Manutenção "${descriptionOrId}" não encontrada no veículo.`);
+    }
+
+    // Sincronizar campo notes
+    const syncedNotes = updatedList.map((m: any) => {
+        const dateBr = (m.date || "").split("-").reverse().join("/");
+        const prevText = m.expectedReturnDate ? ` [Previsão retorno: ${m.expectedReturnDate.split('-').reverse().join('/')}]` : '';
+        return `[${dateBr}] ${m.description} (Status: ${m.status}${prevText})`;
+    }).join("\n");
+
+    await doc.ref.update({
+        maintenanceList: updatedList,
+        notes: syncedNotes
+    });
+
+    return {
+        success: true,
+        vehicleId: doc.id,
+        plate: vData.plate,
+        model: vData.model,
+        updatedItem: matchedItem
     };
 };
 
@@ -900,27 +1121,163 @@ export const addOSNoteAdmin = async (companyId: string, osCodeOrId: string, type
             type,
             text,
             author: author || 'NORA',
-            createdAt: new Date().toISOString(),
+            createdAt: getBrasiliaDate().toISOString(),
             status: type === 'pendencia' || type === 'defeito' ? 'Pendente' : 'Registrado'
         };
 
         const docRef = docMatch.ref;
         const existingNotes = docMatch.data().osNotes || [];
+        
+        // Sincroniza também no campo notes (Relatório Técnico)
+        const currentReport = docMatch.data().notes ? docMatch.data().notes.trim() : '';
+        const timestampBr = format(getBrasiliaDate(), 'dd/MM/yyyy HH:mm');
+        const prefixLabel = type === 'pendencia' ? '[PENDÊNCIA]' : (type === 'defeito' ? '[DEFEITO]' : '[OBS]');
+        const reportEntry = `[${timestampBr} - ${author || 'NORA'}] ${prefixLabel}: ${text}`;
+        const updatedReport = currentReport ? `${currentReport}\n${reportEntry}` : reportEntry;
+
         await docRef.update({
-            osNotes: [...existingNotes, newNote]
+            osNotes: [...existingNotes, newNote],
+            notes: updatedReport
         });
 
         const unitTag = docMatch.data().unitIdentifier ? ` (${docMatch.data().unitIdentifier})` : '';
 
         return { 
             success: true, 
-            message: `${type === 'pendencia' ? 'Pendência' : (type === 'defeito' ? 'Defeito' : 'Observação')} registrada com sucesso diretamente na ${docMatch.data().quoteNumber}${unitTag}!`,
+            message: `${type === 'pendencia' ? 'Pendência' : (type === 'defeito' ? 'Defeito' : 'Observação')} registrada com sucesso diretamente no Relatório da ${docMatch.data().quoteNumber}${unitTag}!`,
             note: newNote,
             osNumber: docMatch.data().quoteNumber,
             unitIdentifier: docMatch.data().unitIdentifier
         };
     } catch (e: any) {
         return { error: 'Falha ao registrar nota na OS: ' + e.message };
+    }
+};
+
+export const addOSReportAdmin = async (
+    companyId: string, 
+    osIdentifier: string, 
+    data: { 
+        text: string; 
+        unitIdentifier?: string; 
+        status?: string; 
+        photoUrl?: string; 
+        author?: string; 
+    }
+) => {
+    try {
+        const term = (osIdentifier || '').trim().toUpperCase();
+        const unitTerm = (data.unitIdentifier || '').trim().toUpperCase();
+        const normalizedCode = term.replace('OS-', 'ORC-');
+        const numberMatch = term.match(/\d+/);
+        const numberPart = numberMatch ? numberMatch[0] : null;
+        const numberPartNoZeros = numberPart ? parseInt(numberPart, 10).toString() : null;
+
+        const snap = await firestore.collection(QUOTES_COLLECTION).where("companyId", "==", companyId).get();
+        const allQuotes = snap.docs.map(d => ({ doc: d, data: d.data() })).filter(item => !item.data.deletedAt);
+
+        // 1. Se informou número de orçamento/OS E unidade (ex: "0145/26" e "Caminhão 019" ou "Casa 04")
+        let matched = allQuotes.find(item => {
+            const qNum = (item.data.quoteNumber || '').toUpperCase();
+            const parentNum = (item.data.parentQuoteNumber || '').toUpperCase();
+            const uId = (item.data.unitIdentifier || '').toUpperCase();
+            
+            const matchOS = qNum === term || qNum === normalizedCode || parentNum === term || parentNum === normalizedCode || (numberPart && (qNum.includes(numberPart) || parentNum.includes(numberPart)));
+            if (unitTerm && matchOS) {
+                return uId.includes(unitTerm) || unitTerm.includes(uId);
+            }
+            return false;
+        });
+
+        // 2. Se não encontrou por ambos, busca direto por termo na unidade ou quoteNumber
+        if (!matched) {
+            matched = allQuotes.find(item => {
+                const qNum = (item.data.quoteNumber || '').toUpperCase();
+                const uId = (item.data.unitIdentifier || '').toUpperCase();
+                if (item.doc.id === osIdentifier) return true;
+                if (uId && (uId.includes(term) || (unitTerm && uId.includes(unitTerm)))) return true;
+                return qNum === term || qNum === normalizedCode || qNum === term.replace('OS-', 'ORC-') || qNum === term.replace('ORC-', 'OS-');
+            });
+        }
+
+        // 3. Fallback por número parcial
+        if (!matched && numberPartNoZeros) {
+            matched = allQuotes.find(item => {
+                const qNum = (item.data.quoteNumber || '').toUpperCase();
+                const uId = (item.data.unitIdentifier || '').toUpperCase();
+                if (unitTerm && uId && uId.includes(unitTerm)) return true;
+                return qNum.includes(`-${numberPartNoZeros}/`) || qNum.includes(`-${numberPartNoZeros.padStart(4, '0')}/`);
+            });
+        }
+
+        if (!matched) {
+            return { error: `Ordem de Serviço / Unidade "${osIdentifier}${unitTerm ? ` - ${unitTerm}` : ''}" não foi localizada no sistema.` };
+        }
+
+        const docRef = matched.doc.ref;
+        const qData = matched.data;
+
+        const author = data.author || 'NORA';
+        const timestampBr = format(getBrasiliaDate(), 'dd/MM/yyyy HH:mm');
+        const entryHeader = `[${timestampBr} - ${author}]: ${data.text}`;
+
+        // Atualiza notes (Relatório Técnico)
+        const currentNotes = qData.notes ? qData.notes.trim() : '';
+        const updatedNotes = currentNotes ? `${currentNotes}\n${entryHeader}` : entryHeader;
+
+        const updatePayload: any = {
+            notes: updatedNotes
+        };
+
+        // Atualiza status se fornecido
+        if (data.status) {
+            const rawStatus = data.status.trim();
+            let finalStatus = rawStatus;
+            if (rawStatus.toLowerCase().includes('concl') || rawStatus.toLowerCase().includes('finaliz')) {
+                finalStatus = 'Finalizado';
+                updatePayload.completionDate = getBrasiliaDate().toISOString();
+            } else if (rawStatus.toLowerCase().includes('execu')) {
+                finalStatus = 'Em Execução';
+            } else if (rawStatus.toLowerCase().includes('pend')) {
+                finalStatus = 'Pendente';
+            } else if (rawStatus.toLowerCase().includes('agend')) {
+                finalStatus = 'Agendada';
+            }
+            updatePayload.status = finalStatus;
+        }
+
+        // Adiciona foto se fornecida
+        if (data.photoUrl) {
+            const existingImages = qData.serviceImages || [];
+            updatePayload.serviceImages = [...existingImages, data.photoUrl];
+        }
+
+        // Registra também em osNotes para histórico estruturado
+        const existingOsNotes = qData.osNotes || [];
+        const newNoteItem = {
+            id: `report_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            type: 'observacao',
+            text: data.text,
+            author,
+            createdAt: getBrasiliaDate().toISOString(),
+            status: 'Registrado'
+        };
+        updatePayload.osNotes = [...existingOsNotes, newNoteItem];
+
+        await docRef.update(updatePayload);
+
+        const osTitle = `${qData.quoteNumber.replace('ORC', 'OS')}${qData.unitIdentifier ? ` (${qData.unitIdentifier})` : ''}`;
+
+        return {
+            success: true,
+            message: `Informação adicionada com sucesso no Relatório Técnico da ${osTitle}!${data.status ? ` Status atualizado para: ${updatePayload.status}.` : ''}`,
+            osNumber: qData.quoteNumber,
+            unitIdentifier: qData.unitIdentifier,
+            updatedNotes,
+            status: updatePayload.status || qData.status
+        };
+    } catch (e: any) {
+        return { error: 'Falha ao atualizar relatório da OS: ' + e.message };
     }
 };
 

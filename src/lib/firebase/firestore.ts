@@ -1455,11 +1455,78 @@ export const getVehiclesOnce = async (db: Firestore, companyId: string): Promise
 };
 
 export const addVehicle = async (db: Firestore, data: any) => {
-    await addDoc(collection(db, VEHICLES_COLLECTION), { ...data, creationDate: getBrasiliaDate().toISOString() });
+    await addDoc(collection(db, VEHICLES_COLLECTION), sanitizeData({ ...data, creationDate: getBrasiliaDate().toISOString() }));
 };
 
 export const updateVehicle = async (db: Firestore, id: string, data: any) => {
-    await setDoc(doc(db, VEHICLES_COLLECTION, id), data, { merge: true });
+    await setDoc(doc(db, VEHICLES_COLLECTION, id), sanitizeData(data), { merge: true });
+};
+
+export const addVehicleMaintenanceItem = async (db: Firestore, vehicleId: string, item: any) => {
+    const vRef = doc(db, VEHICLES_COLLECTION, vehicleId);
+    const snap = await getDoc(vRef);
+    if (!snap.exists()) throw new Error("Veículo não encontrado.");
+    const current = snap.data() as Vehicle;
+    const maintenanceList = current.maintenanceList || [];
+    
+    const newItem = {
+        id: item.id || `maint_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        description: item.description,
+        date: item.date || format(getBrasiliaDate(), 'yyyy-MM-dd'),
+        expectedReturnDate: item.expectedReturnDate || undefined,
+        status: item.status || 'Agendado',
+        createdAt: getBrasiliaDate().toISOString(),
+        createdBy: item.createdBy || 'Sistema',
+        cost: item.cost ? Number(item.cost) : 0,
+        notes: item.notes || ''
+    };
+
+    // Insere no topo em ordem cronológica decrescente
+    const updatedList = [newItem, ...maintenanceList].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    await setDoc(vRef, sanitizeData({ maintenanceList: updatedList }), { merge: true });
+    return newItem;
+};
+
+export const updateVehicleMaintenanceStatus = async (
+    db: Firestore, 
+    vehicleId: string, 
+    maintenanceId: string, 
+    status: 'Agendado' | 'Em Manutenção' | 'Pendente' | 'Concluído',
+    expectedReturnDate?: string
+) => {
+    const vRef = doc(db, VEHICLES_COLLECTION, vehicleId);
+    const snap = await getDoc(vRef);
+    if (!snap.exists()) throw new Error("Veículo não encontrado.");
+    const current = snap.data() as Vehicle;
+    const maintenanceList = current.maintenanceList || [];
+    
+    const updatedList = maintenanceList.map(m => {
+        if (m.id === maintenanceId) {
+            const res: any = {
+                ...m,
+                status
+            };
+            if (expectedReturnDate) {
+                res.expectedReturnDate = expectedReturnDate;
+            }
+            if (status === 'Concluído') {
+                res.completedAt = getBrasiliaDate().toISOString();
+            }
+            return res;
+        }
+        return m;
+    });
+
+    await setDoc(vRef, sanitizeData({ maintenanceList: updatedList }), { merge: true });
+};
+
+export const deleteVehicleMaintenanceItem = async (db: Firestore, vehicleId: string, maintenanceId: string) => {
+    const vRef = doc(db, VEHICLES_COLLECTION, vehicleId);
+    const snap = await getDoc(vRef);
+    if (!snap.exists()) throw new Error("Veículo não encontrado.");
+    const current = snap.data() as Vehicle;
+    const maintenanceList = (current.maintenanceList || []).filter(m => m.id !== maintenanceId);
+    await setDoc(vRef, sanitizeData({ maintenanceList }), { merge: true });
 };
 
 export const deleteVehicle = async (db: Firestore, id: string) => {

@@ -195,6 +195,35 @@ export default function VeiculosPage() {
                                             )}
                                         </div>
                                     </div>
+
+                                    {vehicle.maintenanceList && vehicle.maintenanceList.length > 0 && (
+                                         <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                                             {vehicle.maintenanceList.filter(m => m.status === 'Em Manutenção').length > 0 && (
+                                                 <Badge className="h-5 px-2 text-[9px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-800">
+                                                     🟣 {vehicle.maintenanceList.filter(m => m.status === 'Em Manutenção').length} Em Manutenção
+                                                     {vehicle.maintenanceList.find(m => m.status === 'Em Manutenção')?.expectedReturnDate && (
+                                                         <span className="ml-1 opacity-80">(Prev: {vehicle.maintenanceList.find(m => m.status === 'Em Manutenção')?.expectedReturnDate?.split('-').reverse().join('/')})</span>
+                                                     )}
+                                                 </Badge>
+                                             )}
+                                             {vehicle.maintenanceList.filter(m => m.status === 'Agendado').length > 0 && (
+                                                 <Badge className="h-5 px-2 text-[9px] font-bold bg-blue-500/10 text-blue-600 border border-blue-200 border-none">
+                                                     🔵 {vehicle.maintenanceList.filter(m => m.status === 'Agendado').length} Agendado(s)
+                                                 </Badge>
+                                             )}
+                                             {vehicle.maintenanceList.filter(m => m.status === 'Pendente').length > 0 && (
+                                                 <Badge className="h-5 px-2 text-[9px] font-bold bg-amber-500/10 text-amber-600 border border-amber-200 border-none">
+                                                     🟠 {vehicle.maintenanceList.filter(m => m.status === 'Pendente').length} Pendente(s)
+                                                 </Badge>
+                                             )}
+                                             {vehicle.maintenanceList.filter(m => m.status === 'Concluído').length > 0 && 
+                                              vehicle.maintenanceList.filter(m => m.status === 'Agendado' || m.status === 'Pendente' || m.status === 'Em Manutenção').length === 0 && (
+                                                 <Badge className="h-5 px-2 text-[9px] font-bold bg-green-500/10 text-green-600 border border-green-200 border-none">
+                                                     🟢 {vehicle.maintenanceList.filter(m => m.status === 'Concluído').length} Concluído(s)
+                                                 </Badge>
+                                             )}
+                                         </div>
+                                     )}
                                 </div>
 
                                 <div className="flex gap-2 pt-2">
@@ -242,13 +271,27 @@ export default function VeiculosPage() {
                                     >
                                         Colaborador(es) Vinculado(s)
                                     </TableHead>
+                                    <TableHead 
+                                        className="px-8 font-semibold text-[10px] opacity-40 h-[34px]"
+                                    >
+                                        Manutenções
+                                    </TableHead>
                                     <TableHead className="w-20 px-8 h-[34px]"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody className="border-none">
-                                {filteredVehicles.map(vehicle => (
-                                    <TableRow key={vehicle.id} className="group transition-all duration-500 border-border/40 h-[34px] hover:bg-primary/10 even:bg-blue-50 dark:even:bg-blue-900/30">
-                                        <TableCell className="py-0 px-8">
+                                {filteredVehicles.map(vehicle => {
+                                    const mList = vehicle.maintenanceList || [];
+                                    const inMaintList = mList.filter(m => m.status === 'Em Manutenção');
+                                    const inMaintCount = inMaintList.length;
+                                    const activeInMaint = inMaintList[0];
+                                    const scheduledCount = mList.filter(m => m.status === 'Agendado').length;
+                                    const pendingCount = mList.filter(m => m.status === 'Pendente').length;
+                                    const doneCount = mList.filter(m => m.status === 'Concluído').length;
+
+                                    return (
+                                    <TableRow key={vehicle.id} className="group transition-all duration-500 border-border/40 h-[42px] hover:bg-primary/10 even:bg-blue-50 dark:even:bg-blue-900/30 cursor-pointer" onClick={() => handleEdit(vehicle)}>
+                                        <TableCell className="py-1 px-8">
                                             <div className="flex flex-col">
                                                 <div className="flex items-center gap-2 mb-0.5">
                                                     <span className="font-semibold text-xs uppercase tracking-widest text-primary/40 group-hover:text-primary/60 transition-colors">{vehicle.brand}</span>
@@ -258,16 +301,16 @@ export default function VeiculosPage() {
                                                 <span className="font-semibold text-xs tracking-tight text-foreground uppercase">{vehicle.model}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="py-0 px-8">
+                                        <TableCell className="py-1 px-8">
                                             <Badge variant="outline" className="h-6 px-4 rounded-full font-mono font-semibold text-xs uppercase tracking-widest border-border/40 group-hover:border-primary/25 transition-all">
                                                 {vehicle.plate}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="py-0 px-8">
-                                            <div className="flex flex-wrap gap-2">
+                                        <TableCell className="py-1 px-8">
+                                            <div className="flex flex-wrap gap-1.5">
                                                 {vehicle.technicianNames && vehicle.technicianNames.length > 0 ? (
                                                     vehicle.technicianNames.map((name, i) => (
-                                                        <Badge key={i} variant="secondary" className="h-6 px-3 rounded-full font-semibold text-[9px] uppercase tracking-widest bg-primary/5 text-primary/70 group-hover:text-primary transition-all border-none">
+                                                        <Badge key={i} variant="secondary" className="h-5 px-2.5 rounded-full font-semibold text-[9px] uppercase tracking-widest bg-primary/5 text-primary/70 group-hover:text-primary transition-all border-none">
                                                             {name}
                                                         </Badge>
                                                     ))
@@ -276,7 +319,37 @@ export default function VeiculosPage() {
                                                 )}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="py-0 px-8 text-right">
+                                        <TableCell className="py-1 px-8">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                {inMaintCount > 0 && (
+                                                    <Badge className="h-5 px-2 text-[9px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-800">
+                                                        🟣 {inMaintCount} Em Manutenção
+                                                        {activeInMaint?.expectedReturnDate && (
+                                                            <span className="ml-1 opacity-80">(Prev: {activeInMaint.expectedReturnDate.split('-').reverse().join('/')})</span>
+                                                        )}
+                                                    </Badge>
+                                                )}
+                                                {scheduledCount > 0 && (
+                                                    <Badge className="h-5 px-2 text-[9px] font-bold bg-blue-500/10 text-blue-600 border border-blue-200 border-none">
+                                                        🔵 {scheduledCount} Agendado{scheduledCount > 1 ? 's' : ''}
+                                                    </Badge>
+                                                )}
+                                                {pendingCount > 0 && (
+                                                    <Badge className="h-5 px-2 text-[9px] font-bold bg-amber-500/10 text-amber-600 border border-amber-200 border-none">
+                                                        🟠 {pendingCount} Pendente{pendingCount > 1 ? 's' : ''}
+                                                    </Badge>
+                                                )}
+                                                {doneCount > 0 && scheduledCount === 0 && pendingCount === 0 && inMaintCount === 0 && (
+                                                    <Badge className="h-5 px-2 text-[9px] font-bold bg-green-500/10 text-green-600 border border-green-200 border-none">
+                                                        🟢 {doneCount} Concluído{doneCount > 1 ? 's' : ''}
+                                                    </Badge>
+                                                )}
+                                                {mList.length === 0 && (
+                                                    <span className="text-[10px] font-semibold opacity-30">Em dia</span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="py-1 px-8 text-right" onClick={(e) => e.stopPropagation()}>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button variant="ghost" className="h-6 w-6 p-0 rounded-md hover:bg-primary/10 transition-all" onClick={(e) => e.stopPropagation()}>
@@ -294,10 +367,11 @@ export default function VeiculosPage() {
                                             </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                    );
+                                })}
                                 {filteredVehicles.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="py-0 h-40 text-center">
+                                        <TableCell colSpan={5} className="py-0 h-40 text-center">
                                             <div className="flex flex-col items-center justify-center py-10 opacity-20">
                                                 <Car className="h-8 w-8 mb-3" />
                                                 <p className="font-semibold uppercase tracking-[0.2em] text-[10px]">Nenhum veículo na listagem</p>

@@ -663,6 +663,20 @@ export type PurchaseOrder = {
   deletedAt?: string;
 };
 
+export type VehicleMaintenanceItem = {
+  id: string;
+  description: string;
+  date: string; // YYYY-MM-DD (Data de entrada ou registro)
+  expectedReturnDate?: string; // YYYY-MM-DD (Data de previsão de entrega/retorno da oficina)
+  status: 'Agendado' | 'Em Manutenção' | 'Pendente' | 'Concluído';
+  createdAt: string; // ISO String
+  createdBy?: string;
+  completedAt?: string;
+  cost?: number;
+  serviceProvider?: string;
+  notes?: string;
+};
+
 export type Vehicle = {
   id: string;
   companyId: string;
@@ -674,6 +688,7 @@ export type Vehicle = {
   technicianNames?: string[];
   isShared: boolean;
   notes?: string;
+  maintenanceList?: VehicleMaintenanceItem[];
   creationDate?: string;
   deletedAt?: string;
 };

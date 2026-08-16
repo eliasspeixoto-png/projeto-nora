@@ -38,6 +38,7 @@ import {
   createToolAdmin,
   bulkUpdateClientsAdmin,
   addOSNoteAdmin,
+  addOSReportAdmin,
   getBudgetPendingSummaryAdmin,
   settleReceivableAdmin,
   addObservationAdmin,
@@ -50,7 +51,10 @@ import {
   processPaymentReceiptAdmin,
   getCompanyAiSettingsAdmin,
   editQuoteItemsAdmin,
-  addVehicleNoteAdmin
+  addVehicleNoteAdmin,
+  addVehicleMaintenanceAdmin,
+  getVehicleMaintenancesAdmin,
+  updateVehicleMaintenanceStatusAdmin
 } from '@/lib/firebase/admin-db';
 import { firestore } from '@/lib/firebase/admin';
 import { sendWhatsappMessage } from '@/lib/whatsapp/evolution-client';
@@ -792,8 +796,26 @@ const tools = [
   {
     type: 'function',
     function: {
+      name: 'add_os_report',
+      description: 'Registra uma anotação, relatório de serviço técnico, foto ou altera o status diretamente no campo Relatório Técnico / Relatório de Serviço de uma Ordem de Serviço (O.S) ou Orçamento. Use SEMPRE que o usuário pedir para registrar serviços executados, pendências em campo ou alterar status de uma OS.',
+      parameters: {
+        type: 'object',
+        properties: {
+          osIdentifier: { type: 'string', description: 'Número do orçamento ou código da OS (ex: "0145/26", "145", "OS-0145/26").' },
+          text: { type: 'string', description: 'Descrição técnica detalhada informando o que foi feito, constatado ou resolvido.' },
+          unitIdentifier: { type: 'string', description: 'Opcional. Se for relativo a um caminhão, placa, casa, bloco ou unidade (ex: "Caminhão 019", "BT 019", "Casa 04").' },
+          status: { type: 'string', description: 'Opcional. Novo status para a OS (ex: "Finalizado", "Em Execução", "Pendente", "Agendada").' },
+          photoUrl: { type: 'string', description: 'Opcional. Se houver foto/anexo para vincular à O.S.' }
+        },
+        required: ['osIdentifier', 'text']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'add_vehicle_note',
-      description: 'Adiciona uma anotação, histórico de manutenção, troca de pneus, troca de óleo, revisão ou observação diretamente no campo "Observações e Manutenção" do cadastro do veículo (na aba Veículos). Use SEMPRE que o usuário pedir para registrar ou adicionar observação em um veículo ou na manutenção de um carro/moto/caminhão da frota.',
+      description: 'Adiciona uma anotação, histórico de manutenção, troca de pneus, troca de óleo, revisão ou observação diretamente no cadastro do veículo (na aba Veículos). Use SEMPRE que o usuário pedir para registrar ou adicionar observação em um veículo ou na manutenção de um carro/moto/caminhão da frota.',
       parameters: {
         type: 'object',
         properties: {
@@ -801,6 +823,74 @@ const tools = [
           text: { type: 'string', description: 'O texto da observação ou manutenção a ser registrado (ex: "[03/08/2026] Troca de par de pneus dianteiros").' }
         },
         required: ['vehicleTerm', 'text']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_vehicle_maintenance',
+      description: 'Registra uma manutenção estruturada de veículo com status (Agendado, Em Manutenção, Pendente ou Concluído), data de entrada, data de previsão de retorno da oficina e descrição. Use sempre que o usuário pedir para agendar, registrar ou avisar que um veículo está na oficina/em manutenção.',
+      parameters: {
+        type: 'object',
+        properties: {
+          vehicleTerm: { type: 'string', description: 'Placa ou Modelo do veículo (ex: "HKH 2180", "Montana", "DR 160").' },
+          description: { type: 'string', description: 'Descrição clara do serviço (ex: "Troca de par de pneus dianteiros", "Troca do trambulador do câmbio na oficina").' },
+          date: { type: 'string', description: 'Data do serviço/entrada no formato YYYY-MM-DD (ex: "2026-08-16").' },
+          expectedReturnDate: { type: 'string', description: 'Data prevista de retorno/entrega do veículo pela oficina no formato YYYY-MM-DD (ex: "2026-08-18") (opcional).' },
+          status: { type: 'string', enum: ['Agendado', 'Em Manutenção', 'Pendente', 'Concluído'], description: 'Status da manutenção. Use "Em Manutenção" quando o veículo estiver na oficina/em reparo, "Agendado" para datas futuras, "Pendente" para problemas aguardando oficina, "Concluído" para serviços finalizados.' },
+          cost: { type: 'number', description: 'Valor gasto ou orçado (opcional).' }
+        },
+        required: ['vehicleTerm', 'description']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_vehicle_maintenances',
+      description: 'Consulta as manutenções da frota filtrando por veículo (opcional) e por status (Agendado, Em Manutenção, Pendente, Concluído ou todas). Use SEMPRE que o usuário perguntar o que está agendado, quais veículos estão na oficina/em manutenção, o que está pendente ou o histórico.',
+      parameters: {
+        type: 'object',
+        properties: {
+          vehicleTerm: { type: 'string', description: 'Placa ou Modelo do veículo para filtrar (opcional, ex: "Montana", "HKH 2180"). Se não informado, lista de toda a frota.' },
+          status: { type: 'string', enum: ['Agendado', 'Em Manutenção', 'Pendente', 'Concluído', 'all'], description: 'Filtrar por status ("Agendado", "Em Manutenção", "Pendente", "Concluído" ou "all").' }
+        }
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_vehicle_maintenance_status',
+      description: 'Altera o status de uma manutenção de veículo (ex: mudar para "Em Manutenção", "Concluído", "Agendado" ou "Pendente") e pode atualizar a previsão de retorno.',
+      parameters: {
+        type: 'object',
+        properties: {
+          vehicleTerm: { type: 'string', description: 'Placa ou Modelo do veículo (ex: "Montana", "HKH 2180").' },
+          descriptionOrId: { type: 'string', description: 'Descrição ou trecho do serviço para identificar a manutenção (ex: "troca de pneus", "trambulador").' },
+          status: { type: 'string', enum: ['Agendado', 'Em Manutenção', 'Pendente', 'Concluído'], description: 'Novo status da manutenção.' },
+          expectedReturnDate: { type: 'string', description: 'Data prevista de entrega/retorno da oficina no formato YYYY-MM-DD (opcional).' }
+        },
+        required: ['vehicleTerm', 'descriptionOrId', 'status']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_os_report',
+      description: 'Adiciona uma anotação, relatório de serviço, observação técnica, pendência, defeito ou atualização de status diretamente no campo "Relatório do Serviço / Relatório Técnico" da Ordem de Serviço ou Sub-OS (ex: vinculada a um caminhão, placa, unidade ou casa). Use SEMPRE que o usuário disser "adiciona no orçamento/OS tal / caminhão tal / casa tal que tal coisa ficou assim/foi feita", ou quando pedir para atualizar status/foto da OS.',
+      parameters: {
+        type: 'object',
+        properties: {
+          osIdentifier: { type: 'string', description: 'Número do Orçamento ou OS (ex: "0145/26", "ORC-0145/26", "145") ou identificador da OS.' },
+          text: { type: 'string', description: 'O texto do relatório técnico / serviço executado / pendência a ser adicionado.' },
+          unitIdentifier: { type: 'string', description: 'Identificador específico da sub-unidade, caminhão, placa ou casa, se aplicável (ex: "Caminhão 019", "BT 019", "Casa 04", "Unidade 02").' },
+          status: { type: 'string', enum: ['Em Execução', 'Finalizado', 'Pendente', 'Agendada', 'Devolvida'], description: 'Novo status da OS, se o usuário tiver solicitado alterar (opcional).' },
+          photoUrl: { type: 'string', description: 'URL da foto/anexo para vincular ao relatório da OS (opcional).' }
+        },
+        required: ['osIdentifier', 'text']
       }
     }
   }
@@ -1169,6 +1259,15 @@ async function executeTool(toolCall: any, context: any) {
       case 'add_vehicle_note':
         return await addVehicleNoteAdmin(companyId, args.vehicleTerm, args.text);
 
+      case 'add_vehicle_maintenance':
+        return await addVehicleMaintenanceAdmin(companyId, args.vehicleTerm, args);
+
+      case 'get_vehicle_maintenances':
+        return await getVehicleMaintenancesAdmin(companyId, args.vehicleTerm, args.status);
+
+      case 'update_vehicle_maintenance_status':
+        return await updateVehicleMaintenanceStatusAdmin(companyId, args.vehicleTerm, args.descriptionOrId, args.status, args.expectedReturnDate);
+
       case 'add_observation':
         return await addObservationAdmin(companyId, args.tags, args.text, displayName, args.scope || 'local');
 
@@ -1223,6 +1322,15 @@ async function executeTool(toolCall: any, context: any) {
 
       case 'edit_quote_items':
         return await editQuoteItemsAdmin(companyId, args.quoteId, args.items, displayName);
+
+      case 'add_os_report':
+        return await addOSReportAdmin(companyId, args.osIdentifier, {
+          text: args.text,
+          unitIdentifier: args.unitIdentifier,
+          status: args.status,
+          photoUrl: args.photoUrl,
+          author: displayName
+        });
 
       default:
         return { error: `Ferramenta ${name} não encontrada` };
@@ -1346,9 +1454,30 @@ INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
    - **ESCLARECIMENTO DE DÚVIDAS:** Se o usuário disser apenas "terreno 10x30" ou passar medidas ambíguas sem especificar quais lados serão cercados, pergunte de forma objetiva:
      * "[[ azul: A cerca será instalada apenas na frente (10m), em L (frente + 1 lateral), em U (3 lados) ou fechando o terreno completo nos 4 lados? ]]"
     - **USO OBRIGATÓRIO DA CALCULADORA DE CERCA:** Você DEVE chamar 'save_fence_quote' com os parâmetros calculados para gerar o dimensionamento exato de todas as hastes, isoladores, cabos e central, salvando e gerando o PDF da proposta.
-11. **REGISTRO DE MANUTENÇÃO E OBSERVAÇÕES DE VEÍCULOS (FROTA):**
-   - Se o usuário pedir para registrar, anotar, salvar manutenção, troca de peças, óleo, pneus, revisões, problemas mecânicos ou observações em um veículo da frota (ex: "adicione na observação de manutenção da montana hkh 2180...", "adicione também que a montana precisa levar a oficina...", "troca de óleo da moto", "problema de câmbio na montana"), você DEVE chamar IMEDIATAMENTE a ferramenta \`add_vehicle_note\` informando o modelo/placa do veículo e o texto.
-   - NUNCA use \`add_observation\` para notas ou manutenções de veículos. Os veículos possuem campo próprio no cadastro da frota (\`vehicles\`), visível no modal "Editar Veículo" da aba Veículos.
+11. **GESTÃO DE MANUTENÇÃO DE VEÍCULOS DA FROTA (AGENDADO, EM MANUTENÇÃO / OFICINA, PENDENTE E CONCLUÍDO):**
+   - **Cadastro/Agendamento/Oficina:** Se o usuário pedir para registrar, agendar ou avisar que um veículo foi para oficina/está em manutenção (ex: "montana foi para oficina trocar trambulador previsão dia 18/08", "agenda troca de pneus na montana para 01/06", "montana precisa trocar trambulador"), você DEVE chamar IMEDIATAMENTE a ferramenta \`add_vehicle_maintenance\` informando o veículo, a descrição, a data (YYYY-MM-DD), a data de previsão de retorno (\`expectedReturnDate\` se houver) e o status apropriado:
+     - 🟣 **Em Manutenção:** Quando o veículo estiver atualmente na oficina ou sendo reparado.
+     - 🔵 **Agendado:** Para serviços agendados para datas futuras.
+     - 🟠 **Pendente:** Para defeitos ou manutenções que ainda precisam de oficina/peças.
+     - 🟢 **Concluído:** Para serviços que já foram finalizados e entregues.
+   - **Consultas por Status:** Se o usuário perguntar o que está agendado, quais veículos estão na oficina/em manutenção, o que está pendente ou o histórico de um veículo (ex: "quais veículos estão na oficina?", "o que tem agendado para a montana?", "quais manutenções estão pendentes?", "histórico da montana"), você DEVE chamar \`get_vehicle_maintenances\`.
+   - **Apresentação Clara por Status:** Ao responder sobre manutenções, separe SEMPRE em categorias visíveis com emojis:
+     - 🟣 **Em Manutenção (Na Oficina):** Listar descrição, data de entrada e previsão de retorno/entrega.
+     - 🔵 **Agendados:** Listar descrição e data prevista.
+     - 🟠 **Pendentes:** Listar serviços e peças aguardando oficina.
+     - 🟢 **Concluídos:** Listar serviços já realizados e suas datas.
+   - **Atualização de Status:** Se o usuário pedir para mudar o status (ex: "marca a montana como em manutenção", "marca a troca de pneus da montana como concluída"), chame \`update_vehicle_maintenance_status\`.
+   - NUNCA use \`add_observation\` para veículos.
+
+12. **LANÇAMENTO EM ORDENS DE SERVIÇO (RELATÓRIO TÉCNICO, STATUS E FOTOS):**
+   - **Registro em Campo:** Sempre que o usuário ou técnico pedir para adicionar informação, andamento, serviços executados, pendências ou problemas em uma O.S. ou Orçamento (ex: "nora adiciona no orçamento 0145/26 / caminhão 019 / casa 04 que a fiação já foi passada...", "anote na OS do caminhão 145 que o conector foi trocado"), você DEVE chamar IMEDIATAMENTE a ferramenta \`add_os_report\`.
+   - **Parâmetros Obrigatórios:** 
+     * \`osIdentifier\`: Número do orçamento ou código da OS (ex: "0145/26", "145", "OS-0145/26").
+     * \`text\`: Descrição técnica detalhada informando o que foi feito, constatado ou resolvido.
+     * \`unitIdentifier\`: Se for relativo a um caminhão, placa, casa, bloco ou unidade (ex: "Caminhão 019", "BT 019", "Casa 04").
+     * \`status\`: Se o usuário pediu para mudar o status (ex: "Finalizado", "Em Execução", "Pendente", "Agendada").
+     * \`photoUrl\`: Se houver foto/anexo para vincular à O.S.
+   - Isso grava diretamente no campo **"Relatório do Serviço / Relatório Técnico"** da tela de Execução de O.S. daquela unidade específica!
 `;
 
   // Persona 1: CLIENTE (Concierge do Portal)

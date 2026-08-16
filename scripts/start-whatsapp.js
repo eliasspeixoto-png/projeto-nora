@@ -709,9 +709,125 @@ async function startNoraCronPoller() {
     }, 1800000); // 30 minutos
 }
 
+let lastFleetAlertDate = null;
+
+async function startFleetMaintenanceMorningPoller() {
+    setInterval(async () => {
+        if (!globalSock || connectionStatus !== 'open') return;
+
+        try {
+            // Horário de Brasília
+            const nowBrasilia = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+            const currentHour = nowBrasilia.getHours();
+            const todayStr = nowBrasilia.toISOString().split('T')[0];
+
+            // Dispara às 07h da manhã (entre 07:00 e 07:59, apenas 1 vez ao dia)
+            if (currentHour === 7 && lastFleetAlertDate !== todayStr) {
+                console.log(`⏰ [ALERTA 07:00] Verificando manutenções agendadas de veículos para ${todayStr}...`);
+
+                const companiesSnap = await db.collection('companies').get();
+                for (const compDoc of companiesSnap.docs) {
+                    const companyId = compDoc.id;
+                    const compData = compDoc.data();
+
+                    const vehiclesSnap = await db.collection('vehicles')
+                        .where('companyId', '==', companyId)
+                        .get();
+
+                    const alertVehicles = [];
+
+                    for (const vDoc of vehiclesSnap.docs) {
+                        const vData = vDoc.data();
+                        if (vData.deletedAt) continue;
+
+                        const mList = vData.maintenanceList || [];
+                        // Filtra itens com status 'Agendado' cuja data seja hoje ou anterior (atrasadas)
+                        const dueMaintenances = mList.filter((m) => m.status === 'Agendado' && m.date <= todayStr);
+
+                        if (dueMaintenances.length > 0) {
+                            alertVehicles.push({
+                                brand: vData.brand,
+                                model: vData.model,
+                                plate: vData.plate,
+                                technicianNames: vData.technicianNames || [],
+                                maintenances: dueMaintenances
+                            });
+                        }
+                    }
+
+                    if (alertVehicles.length > 0) {
+                        console.log(`🚚 [ALERTA 07:00] Encontradas manutenções agendadas para ${alertVehicles.length} veículos na empresa ${compData.name}`);
+
+                        // Formata a mensagem do alerta
+                        const dateBr = todayStr.split('-').reverse().join('/');
+                        let msg = `🚚 *[${compData.name || 'ESP-TEC'} - Alerta de Manutenção de Frota]*\n`;
+                        msg += `📅 *Data:* ${dateBr}\n\n`;
+                        msg += `Olá! Segue a relação de manutenções agendadas para hoje na frota:\n\n`;
+
+                        alertVehicles.forEach((v) => {
+                            msg += `🔹 *${v.brand} ${v.model} (${v.plate})*\n`;
+                            if (v.technicianNames && v.technicianNames.length > 0) {
+                                msg += `   👤 *Responsável:* ${v.technicianNames.join(', ')}\n`;
+                            }
+                            v.maintenances.forEach((m) => {
+                                const mDateBr = (m.date || '').split('-').reverse().join('/');
+                                msg += `   • *${m.description}* (Data: ${mDateBr})\n`;
+                            });
+                            msg += `\n`;
+                        });
+
+                        msg += `_Lembre-se de realizar a inspeção antes da saída da equipe para o campo._`;
+
+                        // Busca telefones de administradores da empresa para enviar o alerta
+                        const usersSnap = await db.collection('users')
+                            .where('companyId', '==', companyId)
+                            .where('role', '==', 'admin')
+                            .get();
+
+                        const phonesToSend = new Set();
+                        usersSnap.forEach((uDoc) => {
+                            const u = uDoc.data();
+                            if (u.phone) phonesToSend.add(u.phone.replace(/\D/g, ''));
+                            if (u.whatsapp) phonesToSend.add(u.whatsapp.replace(/\D/g, ''));
+                        });
+
+                        if (compData.phone) phonesToSend.add(compData.phone.replace(/\D/g, ''));
+                        if (compData.whatsapp) phonesToSend.add(compData.whatsapp.replace(/\D/g, ''));
+
+                        for (const phone of phonesToSend) {
+                            if (!phone) continue;
+                            const formatted = phone.startsWith('55') ? phone : `55${phone}`;
+                            let targetJid = `${formatted}@s.whatsapp.net`;
+
+                            try {
+                                const results = await globalSock.onWhatsApp(formatted);
+                                if (results && results.length > 0 && results[0].exists) {
+                                    targetJid = results[0].jid;
+                                }
+                            } catch(e) {}
+
+                            try {
+                                await globalSock.sendMessage(targetJid, { text: msg });
+                                console.log(`✅ [ALERTA 07:00] Alerta de frota enviado com sucesso para ${targetJid}`);
+                            } catch(sendErr) {
+                                console.error(`Erro ao enviar alerta de frota para ${targetJid}:`, sendErr.message);
+                            }
+                        }
+                    }
+                }
+
+                lastFleetAlertDate = todayStr;
+            }
+        } catch (err) {
+            console.error('Erro no poller de alerta de frota das 07:00:', err);
+        }
+    }, 60000); // 1 minuto
+}
+
 server.listen(8080, '0.0.0.0', () => {
     console.log('🚀 Servidor HTTP de QR Code e Envio de WhatsApp rodando em http://127.0.0.1:8080/qr');
     startBaileys();
     startReminderPoller();
     startNoraCronPoller();
+    startFleetMaintenanceMorningPoller();
 });
