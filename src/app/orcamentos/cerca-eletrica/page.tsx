@@ -651,7 +651,7 @@ export default function FenceQuotePage() {
                 const targetEmail = client?.email || (client?.name?.toLowerCase().includes('elias') ? 'elias.speixoto@gmail.com' : null);
                 if (wasAutomated && targetEmail) {
                     try {
-                        const pdfUrl = `${window.location.origin}/orcamentos/details/${newQuoteId}`;
+                        const pdfUrl = `${window.location.origin}/orcamentos/view/${newQuoteId}`;
                         sendQuoteEmailAction({
                             to: targetEmail,
                             clientName: client?.name || 'Cliente',

@@ -471,17 +471,19 @@ export default function QuoteDetailsPage() {
         }
 
         setIsEmailSending(true);
-        toast({ title: "Enviando e-mail profissional...", description: "Preparando orçamento para disparo via SendGrid." });
+        toast({ title: "Enviando e-mail corporativo...", description: "Disparando proposta comercial para o cliente." });
 
         try {
-            const pdfUrl = await generatePdfUrl();
+            const viewUrl = `${window.location.origin}/orcamentos/view/${quote!.id}`;
 
             const result = await sendQuoteEmailAction({
                 to: client.email,
                 clientName: client.name,
                 companyName: company!.name,
                 quoteNumber: quote!.quoteNumber,
-                pdfUrl: pdfUrl
+                pdfUrl: viewUrl,
+                companyEmail: company?.email,
+                companyAppPassword: (company as any)?.emailAppPassword,
             });
 
             if (result.success) {
