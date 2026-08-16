@@ -1347,8 +1347,8 @@ INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
      * "[[ azul: A cerca será instalada apenas na frente (10m), em L (frente + 1 lateral), em U (3 lados) ou fechando o terreno completo nos 4 lados? ]]"
     - **USO OBRIGATÓRIO DA CALCULADORA DE CERCA:** Você DEVE chamar 'save_fence_quote' com os parâmetros calculados para gerar o dimensionamento exato de todas as hastes, isoladores, cabos e central, salvando e gerando o PDF da proposta.
 11. **REGISTRO DE MANUTENÇÃO E OBSERVAÇÕES DE VEÍCULOS (FROTA):**
-   - Se o usuário pedir para registrar, anotar ou salvar manutenção, troca de peças, óleo, pneus, revisões ou observações em um veículo da frota (ex: "adicione na observação de manutenção da montana hkh 2180 uma troca de par de pneus...", "troca de óleo do fusca"), você DEVE chamar IMEDIATAMENTE a ferramenta \`add_vehicle_note\` informando o modelo/placa do veículo e o texto.
-   - NUNCA use \`add_observation\` para notas de veículos, pois a frota possui campo próprio no cadastro de veículos (\`vehicles\`), que fica visível na aba Veículos da plataforma.
+   - Se o usuário pedir para registrar, anotar, salvar manutenção, troca de peças, óleo, pneus, revisões, problemas mecânicos ou observações em um veículo da frota (ex: "adicione na observação de manutenção da montana hkh 2180...", "adicione também que a montana precisa levar a oficina...", "troca de óleo da moto", "problema de câmbio na montana"), você DEVE chamar IMEDIATAMENTE a ferramenta \`add_vehicle_note\` informando o modelo/placa do veículo e o texto.
+   - NUNCA use \`add_observation\` para notas ou manutenções de veículos. Os veículos possuem campo próprio no cadastro da frota (\`vehicles\`), visível no modal "Editar Veículo" da aba Veículos.
 `;
 
   // Persona 1: CLIENTE (Concierge do Portal)
