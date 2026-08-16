@@ -1174,7 +1174,16 @@ export const addOSReportAdmin = async (
         const numberPartNoZeros = numberPart ? parseInt(numberPart, 10).toString() : null;
 
         const snap = await firestore.collection(QUOTES_COLLECTION).where("companyId", "==", companyId).get();
-        const allQuotes = snap.docs.map(d => ({ doc: d, data: d.data() })).filter(item => !item.data.deletedAt);
+        let allQuotes = snap.docs.map(d => ({ doc: d, data: d.data() })).filter(item => !item.data.deletedAt);
+
+        // Priorizar as Ordens de Serviço (OS-...) e evitar os Orçamentos Pais (ORC-...)
+        allQuotes.sort((a, b) => {
+            const aIsOs = (a.data.quoteNumber || '').startsWith('OS-');
+            const bIsOs = (b.data.quoteNumber || '').startsWith('OS-');
+            if (aIsOs && !bIsOs) return -1;
+            if (!aIsOs && bIsOs) return 1;
+            return 0;
+        });
 
         // 1. Se informou número de orçamento/OS E unidade (ex: "0145/26" e "Caminhão 019" ou "Casa 04")
         let matched = allQuotes.find(item => {
