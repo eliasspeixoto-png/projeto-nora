@@ -189,7 +189,7 @@ export default function OsExecutionClient({ initialQuote, initialClient }: OsExe
     }
 
     try {
-      if (quote.status !== 'Finalizado') {
+      if (quote.status !== 'Finalizado' && !quote.isChildOS && !quote.parentQuoteId) {
           await createReceivable(firebase.db, quote.id);
       }
       

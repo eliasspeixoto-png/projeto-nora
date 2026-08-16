@@ -799,7 +799,14 @@ export const createReceivable = async (db: Firestore, quoteId: string) => {
     const quote = await getQuote(db, quoteId);
     if (!quote) return;
     
-    // Verifica recebíveis existentes para esta O.S.
+    // REGRA DE OURO: Se for uma O.S. filha de um orçamento fracionado (isChildOS ou tem parentQuoteId),
+    // o financeiro é gerido no nível do Orçamento Pai (geral). NÃO gerar recebível individual por sub-OS!
+    if (quote.isChildOS || quote.parentQuoteId) {
+        console.log(`[createReceivable] O.S. ${quote.quoteNumber} é filha fracionada. O financeiro é controlado no orçamento pai.`);
+        return;
+    }
+    
+    // Verifica recebíveis existentes para este Orçamento/O.S.
     const existingQ = query(
         collection(db, ACCOUNTS_RECEIVABLE_COLLECTION), 
         where("companyId", "==", quote.companyId),
@@ -824,6 +831,35 @@ export const createReceivable = async (db: Firestore, quoteId: string) => {
     // Calcula o saldo pendente restante (se houve adiantamento)
     const remainingAmount = Math.max(0, quote.total - totalAlreadyInReceivables);
     if (remainingAmount <= 0) return;
+
+    // Se o orçamento pai tiver parcelamento definido (installments > 1), gera as parcelas
+    if (quote.installments && quote.installments > 1 && snap.empty) {
+        const batch = writeBatch(db);
+        const now = getBrasiliaDate();
+        const instCount = quote.installments;
+        const totalWithInterest = quote.total * (1 + (quote.interestRate || 0) / 100);
+        const perInst = parseFloat((totalWithInterest / instCount).toFixed(2));
+        
+        for (let i = 1; i <= instCount; i++) {
+            const instRef = doc(collection(db, ACCOUNTS_RECEIVABLE_COLLECTION));
+            batch.set(instRef, sanitizeData({
+                companyId: quote.companyId,
+                quoteId: quote.id,
+                quoteNumber: `${quote.quoteNumber.replace('ORC', 'OS')} (${i}/${instCount})`,
+                clientId: quote.clientId,
+                clientName: quote.clientName,
+                amount: perInst,
+                originalAmount: perInst,
+                status: 'Pendente',
+                dueDate: format(addDays(now, i * 30), 'yyyy-MM-dd'),
+                creationDate: now.toISOString(),
+                parentQuoteNumber: quote.quoteNumber,
+                method: 'BOLETO'
+            }));
+        }
+        await batch.commit();
+        return;
+    }
 
     await addDoc(collection(db, ACCOUNTS_RECEIVABLE_COLLECTION), sanitizeData({
         companyId: quote.companyId,
