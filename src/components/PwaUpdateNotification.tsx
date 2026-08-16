@@ -1,58 +1,121 @@
-
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { Button } from './ui/button';
-import { RefreshCw, Zap } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { RefreshCw, Zap, Sparkles } from 'lucide-react';
 
 /**
- * @fileOverview Componente de detecção de atualizações do PWA.
- * Monitora o Service Worker e avisa o usuário quando uma nova versão (incluindo ícones e lógica)
- * está disponível para ser instalada.
+ * @fileOverview Componente de detecção ultra-rápida de atualizações do PWA e deploys.
+ * Monitora o Service Worker, rotas, foco da janela, retorno do app e API de versão em tempo real.
  */
 
-const PwaUpdateNotification = () => {
-  const [showDialog, setShowDialog] = useState(false);
-  const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
-  const pathname = usePathname();
+const LOCAL_BUILD_TIME = process.env.NEXT_PUBLIC_BUILD_TIME || '';
 
+const PwaUpdateNotification = () => {
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const pathname = usePathname();
+  const checkingRef = useRef(false);
+  const hasTriggeredRef = useRef(false);
+
+  // Executa atualização imediata e limpa caches desatualizados
+  const applyUpdate = useCallback(async () => {
+    if (isUpdating) return;
+    setIsUpdating(true);
+
+    try {
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration?.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      }
+
+      // Limpar caches antigos do navegador
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames
+            .filter((name) => !name.includes('google-fonts'))
+            .map((name) => caches.delete(name))
+        );
+      }
+    } catch (err) {
+      console.warn('Erro ao limpar cache durante atualização:', err);
+    } finally {
+      // Recarrega forçando busca no servidor
+      window.location.reload();
+    }
+  }, [isUpdating]);
+
+  // Função para verificar se há nova versão disponível no servidor
+  const checkForUpdates = useCallback(async () => {
+    if (checkingRef.current || hasTriggeredRef.current) return;
+    checkingRef.current = true;
+
+    try {
+      // 1. Checagem via Service Worker
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          if (registration.waiting) {
+            setUpdateAvailable(true);
+            hasTriggeredRef.current = true;
+            return;
+          }
+          await registration.update().catch(() => {});
+        }
+      }
+
+      // 2. Checagem via API de Versão (tempo real independente de SW)
+      const res = await fetch(`/api/version?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store' },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.buildTime && LOCAL_BUILD_TIME && data.buildTime !== LOCAL_BUILD_TIME) {
+          console.log('⚡ Nova versão de deploy detectada:', data.buildTime, 'vs', LOCAL_BUILD_TIME);
+          setUpdateAvailable(true);
+          hasTriggeredRef.current = true;
+        }
+      }
+    } catch (e) {
+      // Falha silenciosa de rede
+    } finally {
+      checkingRef.current = false;
+    }
+  }, []);
+
+  // Monitoramento contínuo
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') return;
+
+    // 1. Listener de Service Worker
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      // Registra o Service Worker e monitora mudanças
       navigator.serviceWorker.getRegistration().then((registration) => {
         if (!registration) return;
 
-        // 1. Verifica se já existe uma atualização esperando
         if (registration.waiting) {
-          setWaitingWorker(registration.waiting);
-          setShowDialog(true);
+          setUpdateAvailable(true);
+          hasTriggeredRef.current = true;
         }
 
-        // 2. Escuta quando uma nova versão termina de baixar
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                setWaitingWorker(newWorker);
-                setShowDialog(true);
+              if (newWorker.state === 'installed') {
+                setUpdateAvailable(true);
+                hasTriggeredRef.current = true;
               }
             });
           }
         });
       }).catch(() => {});
 
-      // 3. Recarrega a página automaticamente quando a nova versão assumir o controle
       let refreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (!refreshing) {
@@ -61,49 +124,71 @@ const PwaUpdateNotification = () => {
         }
       });
     }
-  }, []);
 
-  // Força a checagem de nova versão sempre que o usuário muda de rota (ex: login -> dashboard)
+    // 2. Checagem imediata ao montar
+    checkForUpdates();
+
+    // 3. Checagem ao focar na aba ou voltar para o app no celular
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        checkForUpdates();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    // 4. Heartbeat rápido a cada 30 segundos
+    const interval = setInterval(checkForUpdates, 30000);
+
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      clearInterval(interval);
+    };
+  }, [checkForUpdates]);
+
+  // Checar também a cada mudança de rota
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') return;
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistration().then((registration) => {
-        if (registration) {
-          registration.update().catch(() => {});
-        }
-      }).catch(() => {});
-    }
-  }, [pathname]);
+    checkForUpdates();
+  }, [pathname, checkForUpdates]);
 
-  const handleUpdate = () => {
-    if (waitingWorker) {
-      // Envia comando para a nova versão ignorar a espera e ativar agora
-      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-      setShowDialog(false);
-    }
-  };
+  if (!updateAvailable) return null;
 
   return (
-    <Dialog open={showDialog} onOpenChange={setShowDialog}>
-      <DialogContent className="sm:max-w-md border-primary/20 shadow-glow-primary bg-background">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-primary">
-            <Zap className="h-5 w-5 animate-pulse" />
-            Nova Versão da Plataforma!
-          </DialogTitle>
-          <DialogDescription className="text-foreground pt-2">
-            Acabamos de lançar melhorias no sistema (incluindo atualizações de ícone e áudio). 
-            Deseja atualizar agora para garantir o funcionamento perfeito no seu celular?
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button onClick={handleUpdate} className="w-full bg-primary hover:bg-primary/90 text-white shadow-lg">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Atualizar Agora
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <div className="bg-primary text-primary-foreground p-4 rounded-2xl shadow-2xl border border-primary-foreground/20 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0 animate-pulse">
+            <Zap className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h4 className="font-bold text-sm leading-tight flex items-center gap-1.5 text-white">
+              Nova versão disponível! <Sparkles className="h-3.5 w-3.5 text-yellow-300" />
+            </h4>
+            <p className="text-xs text-white/80 leading-snug mt-0.5">
+              Atualização pronta com novas melhorias.
+            </p>
+          </div>
+        </div>
+        <Button
+          onClick={applyUpdate}
+          disabled={isUpdating}
+          size="sm"
+          className="bg-white text-primary hover:bg-white/90 font-semibold shadow-md shrink-0 h-9 px-3.5"
+        >
+          {isUpdating ? (
+            <RefreshCw className="h-4 w-4 animate-spin" />
+          ) : (
+            <span className="flex items-center gap-1 text-xs">
+              <RefreshCw className="h-3.5 w-3.5 mr-1" />
+              Atualizar
+            </span>
+          )}
+        </Button>
+      </div>
+    </div>
   );
 };
 

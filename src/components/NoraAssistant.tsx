@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/firebase/auth/use-user';
-import { X, Bot, Trash2, Loader2, Send, Volume2, VolumeX, Mic, Paperclip } from 'lucide-react';
+import { X, Bot, Trash2, Loader2, Send, Volume2, VolumeX, Mic, MicOff, Paperclip, Square } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { cn } from '@/lib/utils';
@@ -40,6 +40,8 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<BlobPart[]>([]);
+  const recognitionRef = useRef<any>(null);
+  const isSpeechRecognitionActiveRef = useRef(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -57,7 +59,7 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
         reader.onload = async () => {
             const base64Data = reader.result as string;
             
-            // Call our new Vision API
+            // Call our Vision API
             const response = await fetch('/api/media/vision', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -93,64 +95,165 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
     }
   };
 
-  const toggleRecording = async () => {
-    if (isRecording) {
-        mediaRecorderRef.current?.stop();
-        setIsRecording(false);
-        return;
-    }
+  const startSpeechRecognition = () => {
+    if (typeof window === 'undefined') return false;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return false;
 
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-        audioChunksRef.current = [];
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
 
-        mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) audioChunksRef.current.push(event.data);
-        };
+      const baseText = input.trim();
 
-        mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-            stream.getTracks().forEach(track => track.stop());
-            
-            setLoading(true);
-            const userMsg: Message = { role: 'user', content: '[Processando áudio...]', timestamp: new Date() };
-            setMessages(prev => [...prev, userMsg]);
-
-            const formData = new FormData();
-            formData.append('file', audioBlob, 'voice.webm');
-
-            try {
-                const response = await fetch('/api/media/transcribe', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-                
-                if (data.text) {
-                    setMessages(prev => {
-                        const newMsgs = [...prev];
-                        newMsgs[newMsgs.length - 1].content = `🎙️ ${data.text}`;
-                        return newMsgs;
-                    });
-                    handleSendInternal(`[Áudio do usuário transcrito]: "${data.text}"`);
-                } else {
-                    toast({ title: 'Erro', description: 'Falha ao transcrever áudio.', variant: 'destructive' });
-                    setLoading(false);
-                }
-            } catch (err) {
-                console.error("Erro no áudio:", err);
-                setLoading(false);
-            }
-        };
-
-        mediaRecorder.start();
+      recognition.onstart = () => {
         setIsRecording(true);
-    } catch (err) {
-        toast({ title: 'Permissão negada', description: 'Libere o microfone no navegador.', variant: 'destructive' });
+        isSpeechRecognitionActiveRef.current = true;
+      };
+
+      recognition.onresult = (event: any) => {
+        let currentInterim = '';
+        let currentFinal = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            currentFinal += event.results[i][0].transcript;
+          } else {
+            currentInterim += event.results[i][0].transcript;
+          }
+        }
+
+        const speechText = (currentFinal + ' ' + currentInterim).trim();
+        const combined = baseText ? `${baseText} ${speechText}` : speechText;
+        if (combined) {
+          setInput(combined);
+          if (inputRef.current) {
+            inputRef.current.style.height = 'auto';
+            inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 130)}px`;
+          }
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('SpeechRecognition erro:', event.error);
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          toast({ title: 'Microfone bloqueado', description: 'Permita o acesso ao microfone no navegador.', variant: 'destructive' });
+        }
+        setIsRecording(false);
+        isSpeechRecognitionActiveRef.current = false;
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+        isSpeechRecognitionActiveRef.current = false;
+        setTimeout(() => inputRef.current?.focus(), 100);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+      return true;
+    } catch (e) {
+      console.warn('Falha ao iniciar SpeechRecognition, usando MediaRecorder:', e);
+      return false;
     }
   };
+
+  const startMediaRecorder = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+        
+        setLoading(true);
+        const userMsg: Message = { role: 'user', content: '[Transcrevendo áudio...]', timestamp: new Date() };
+        setMessages(prev => [...prev, userMsg]);
+
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'voice.webm');
+
+        try {
+          const response = await fetch('/api/media/transcribe', {
+            method: 'POST',
+            body: formData
+          });
+          const data = await response.json();
+          
+          if (data.text && data.text.trim()) {
+            const transcribedText = data.text.trim();
+            setMessages(prev => {
+              const newMsgs = [...prev];
+              newMsgs[newMsgs.length - 1].content = `🎙️ ${transcribedText}`;
+              return newMsgs;
+            });
+            handleSendInternal(`[Áudio do usuário transcrito]: "${transcribedText}"`);
+          } else {
+            toast({ title: 'Aviso', description: data.error || 'Não foi possível identificar o áudio. Tente novamente.', variant: 'destructive' });
+            setMessages(prev => prev.slice(0, -1));
+            setLoading(false);
+          }
+        } catch (err) {
+          console.error("Erro no áudio:", err);
+          toast({ title: 'Erro', description: 'Falha ao processar áudio.', variant: 'destructive' });
+          setMessages(prev => prev.slice(0, -1));
+          setLoading(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      toast({ title: 'Permissão negada', description: 'Libere o microfone no navegador.', variant: 'destructive' });
+      setIsRecording(false);
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (isRecording) {
+      if (isSpeechRecognitionActiveRef.current && recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+        isSpeechRecognitionActiveRef.current = false;
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch (e) {}
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    const SpeechRecognition = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+    if (SpeechRecognition) {
+      const started = startSpeechRecognition();
+      if (!started) {
+        await startMediaRecorder();
+      }
+    } else {
+      await startMediaRecorder();
+    }
+  };
+
+  // Clean up on unmount or close
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch (e) {}
+      }
+    };
+  }, []);
 
   // Separated the backend call so we can call it transparently from media uploads
   const handleSendInternal = async (contentToSend: string) => {
@@ -240,6 +343,14 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
     const text = messageText.trim();
     if (!text || loading || !userProfile) return;
     
+    // If user sends while recording, stop recording
+    if (isRecording) {
+      if (isSpeechRecognitionActiveRef.current && recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+      }
+      setIsRecording(false);
+    }
+
     setInput('');
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
@@ -249,7 +360,7 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
     setLoading(true);
 
     await handleSendInternal(text);
-  }, [loading, userProfile, company, messages, router, pathname]);
+  }, [loading, userProfile, company, messages, router, pathname, isRecording]);
 
 
 
@@ -339,6 +450,22 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
         <div ref={messagesEndRef} />
       </div>
 
+      {isRecording && (
+        <div className="bg-red-50 dark:bg-red-950/40 border-t border-red-200 dark:border-red-900/50 px-4 py-2 flex items-center justify-between text-xs text-red-600 dark:text-red-400 animate-pulse">
+          <div className="flex items-center gap-2 font-medium">
+            <span className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
+            <span>Ouvindo sua voz em tempo real... Fale com a NORA</span>
+          </div>
+          <button 
+            type="button"
+            onClick={toggleRecording} 
+            className="text-red-700 dark:text-red-300 hover:underline font-semibold text-[11px]"
+          >
+            Finalizar fala
+          </button>
+        </div>
+      )}
+
       <div className="p-4 border-t bg-background shrink-0 pb-6">
         <div className="flex gap-2 items-end">
           <input 
@@ -354,6 +481,7 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
             className="shrink-0 h-10 w-10 mb-[1px] text-muted-foreground"
             onClick={() => fileInputRef.current?.click()}
             disabled={loading || isRecording}
+            title="Anexar arquivo ou imagem"
           >
             <Paperclip className="h-5 w-5" />
           </Button>
@@ -369,26 +497,44 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
                     handleSend(input); 
                 } 
             }} 
-            placeholder={isRecording ? "Gravando áudio..." : "Digite sua mensagem..."} 
+            placeholder={isRecording ? "Ouvindo... O texto aparecerá aqui..." : "Digite sua mensagem..."} 
             className={cn(
                 "flex-1 min-h-[40px] max-h-32 border border-input rounded-xl px-3.5 py-2.5 text-sm bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all resize-none overflow-y-auto leading-relaxed shadow-sm",
-                isRecording && "bg-red-50 text-red-600 placeholder:text-red-500 animate-pulse border-red-200"
+                isRecording && "border-red-400 ring-2 ring-red-200 dark:ring-red-900/40 bg-red-50/50 dark:bg-red-950/20"
             )} 
-            disabled={loading || isRecording} 
+            disabled={loading} 
           />
 
-          {!input.trim() ? (
+          {isRecording ? (
             <Button 
-              variant={isRecording ? "destructive" : "ghost"} 
+              variant="destructive" 
               size="icon" 
-              className={cn("shrink-0 h-10 w-10 mb-[1px]", isRecording ? "animate-pulse" : "text-muted-foreground")}
+              className="shrink-0 h-10 w-10 mb-[1px] animate-pulse bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-500/20"
               onClick={toggleRecording}
               disabled={loading}
+              title="Clique para parar de gravar"
+            >
+              <Square className="h-4 w-4 fill-current" />
+            </Button>
+          ) : !input.trim() ? (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="shrink-0 h-10 w-10 mb-[1px] text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              onClick={toggleRecording}
+              disabled={loading}
+              title="Falar por áudio com a NORA"
             >
               <Mic className="h-5 w-5" />
             </Button>
           ) : (
-            <Button onClick={() => handleSend(input)} disabled={loading} size="icon" className="shrink-0 h-10 w-10 mb-[1px]">
+            <Button 
+              onClick={() => handleSend(input)} 
+              disabled={loading} 
+              size="icon" 
+              className="shrink-0 h-10 w-10 mb-[1px] shadow-sm"
+              title="Enviar mensagem"
+            >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           )}

@@ -1,13 +1,20 @@
 const path = require('path');
 
+const BUILD_TIME = new Date().toISOString();
+
 /** @type {import('next').NextConfig} */
 const withPWA = require("@ducanh2912/next-pwa").default({
   dest: "public",
   disable: process.env.NODE_ENV === 'development',
   register: true,
-  skipWaiting: false, // Mantemos falso para gerenciar a atualização via PwaUpdateNotification
+  skipWaiting: true, // Ativa o novo Service Worker imediatamente ao baixar
+  cleanupOutdatedCaches: true,
   cacheOnFrontEndNav: true,
   reloadOnOnline: true,
+  workboxOptions: {
+    clientsClaim: true,
+    skipWaiting: true,
+  },
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i,
@@ -60,6 +67,46 @@ const nextConfig = {
   reactStrictMode: true,
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
+  env: {
+    NEXT_PUBLIC_BUILD_TIME: BUILD_TIME,
+    BUILD_TIME: BUILD_TIME,
+  },
+  async headers() {
+    return [
+      {
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate, max-age=0' },
+          { key: 'Pragma', value: 'no-cache' },
+          { key: 'Expires', value: '0' },
+        ],
+      },
+      {
+        source: '/workbox-:hash.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate, max-age=0' },
+          { key: 'Pragma', value: 'no-cache' },
+          { key: 'Expires', value: '0' },
+        ],
+      },
+      {
+        source: '/manifest.json',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate, max-age=0' },
+          { key: 'Pragma', value: 'no-cache' },
+          { key: 'Expires', value: '0' },
+        ],
+      },
+      {
+        source: '/api/version',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0' },
+          { key: 'Pragma', value: 'no-cache' },
+          { key: 'Expires', value: '0' },
+        ],
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'picsum.photos', port: '', pathname: '/**' },
@@ -107,3 +154,4 @@ const nextConfig = {
 };
 
 module.exports = withPWA(nextConfig);
+
