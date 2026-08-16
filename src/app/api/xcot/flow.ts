@@ -1454,10 +1454,11 @@ INTEGRIDADE ABSOLUTA DE DADOS E ESTOQUE (MANDATO TOOL-FIRST):
 12. **LANÇAMENTO EM ORDENS DE SERVIÇO (RELATÓRIO TÉCNICO, STATUS E FOTOS):**
    - **Registro em Campo:** Sempre que o usuário ou técnico pedir para adicionar informação, andamento, serviços executados, pendências ou problemas em uma O.S. ou Orçamento (ex: "nora adiciona no orçamento 0145/26 / caminhão 019 / casa 04 que a fiação já foi passada...", "anote na OS do caminhão 145 que o conector foi trocado"), você DEVE chamar IMEDIATAMENTE a ferramenta \`add_os_report\`.
    - **Parâmetros Obrigatórios:** 
-     * \`osIdentifier\`: Número do orçamento ou código da OS (ex: "0145/26", "145", "OS-0145/26").
+     * \`osIdentifier\`: Número do orçamento ou código da OS (ex: "0145/26", "145", "OS-0145/26"). Pode enviar vazio se o usuário forneceu apenas a unidade.
      * \`text\`: Descrição técnica detalhada informando o que foi feito, constatado ou resolvido.
      * \`unitIdentifier\`: Se for relativo a um caminhão, placa, casa, bloco ou unidade (ex: "Caminhão 019", "BT 019", "Casa 04").
      * \`status\`: Se o usuário pediu para mudar o status (ex: "Finalizado", "Em Execução", "Pendente", "Agendada").
+   - **PROIBIDO SALVAR NO LUGAR ERRADO:** Se o usuário relatar um defeito em um caminhão (ex: "BT 019 câmera parada"), você DEVE usar \`add_os_report\`. É ABSOLUTAMENTE PROIBIDO usar \`add_observation\` para registrar defeitos de veículos ou problemas de campo. Se a ferramenta \`add_os_report\` retornar erro dizendo que não achou a OS, NÃO salve em observações globais. Apenas informe o usuário: "Não encontrei nenhuma OS aberta para a BT 019. Por favor, me diga o número da OS para eu registrar o defeito."
      * \`photoUrl\`: Se houver foto/anexo para vincular à O.S.
    - Isso grava diretamente no campo **"Relatório do Serviço / Relatório Técnico"** da tela de Execução de O.S. daquela unidade específica!
 `;
