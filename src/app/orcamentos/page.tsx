@@ -84,7 +84,8 @@ export default function OrcamentosPage() {
             const unsubscribeQuotes = getQuotes(db, userProfile.companyId, userProfile, (data) => {
                 const generalQuotes = data.filter(q =>
                     !q.isComodato &&
-                    q.serviceType !== 'Comodato'
+                    q.serviceType !== 'Comodato' &&
+                    !q.isChildOS
                 );
                 setQuotes(generalQuotes);
                 setIsLoading(false);
