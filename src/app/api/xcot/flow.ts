@@ -631,7 +631,7 @@ const tools = [
     type: 'function',
     function: {
       name: 'add_os_note',
-      description: 'Registra uma Pendência, Defeito ou Observação diretamente dentro do documento da Ordem de Serviço (OS) ou Orçamento. Use SEMPRE esta ferramenta quando o usuário pedir para registrar ou adicionar uma pendência, defeito ou nota em uma OS.',
+      description: 'Ferramenta ADMINISTRATIVA para registrar itens na aba "Observações Internas" de uma OS. NÃO USE para registrar andamento de serviço, relatórios de execução, fotos ou anotações de técnicos em campo. Para registrar informações vindas do campo, use SEMPRE a ferramenta add_os_report.',
       parameters: {
         type: 'object',
         properties: {
