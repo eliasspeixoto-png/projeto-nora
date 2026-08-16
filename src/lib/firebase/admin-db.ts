@@ -1133,7 +1133,7 @@ export const addOSNoteAdmin = async (companyId: string, osCodeOrId: string, type
         const timestampBr = format(getBrasiliaDate(), 'dd/MM/yyyy HH:mm');
         const prefixLabel = type === 'pendencia' ? '[PENDÊNCIA]' : (type === 'defeito' ? '[DEFEITO]' : '[OBS]');
         const reportEntry = `[${timestampBr} - ${author || 'NORA'}] ${prefixLabel}: ${text}`;
-        const updatedReport = currentReport ? `${currentReport}\n${reportEntry}` : reportEntry;
+        const updatedReport = currentReport ? `${currentReport}\n\n${reportEntry}` : reportEntry;
 
         await docRef.update({
             osNotes: [...existingNotes, newNote],
@@ -1232,7 +1232,7 @@ export const addOSReportAdmin = async (
 
         // Atualiza notes (Relatório Técnico)
         const currentNotes = qData.notes ? qData.notes.trim() : '';
-        const updatedNotes = currentNotes ? `${currentNotes}\n${entryHeader}` : entryHeader;
+        const updatedNotes = currentNotes ? `${currentNotes}\n\n${entryHeader}` : entryHeader;
 
         const updatePayload: any = {
             notes: updatedNotes
