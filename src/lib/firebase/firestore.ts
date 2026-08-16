@@ -1102,7 +1102,8 @@ export const processPartialPayment = async (db: Firestore, id: string, data: any
         await updateDoc(ref, { 
             status: 'Pago', 
             paymentDate: now.toISOString(), 
-            amount: 0, 
+            amount: current.amount || current.originalAmount || 0, 
+            originalAmount: current.originalAmount || current.amount || 0,
             discount: discount || 0, 
             finalAmount,
             method: method || 'Não informado',

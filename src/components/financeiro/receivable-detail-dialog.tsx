@@ -104,7 +104,8 @@ export default function ReceivableDetailDialog({ isOpen, setOpen, receivable }: 
             };
 
             if (isMarkedPaid) {
-                updatePayload.amount = 0;
+                updatePayload.amount = editAmount;
+                updatePayload.originalAmount = editAmount;
                 updatePayload.paymentDate = paymentDateISO;
                 updatePayload.paymentHistory = [{
                     amount: editAmount,
