@@ -796,24 +796,6 @@ const tools = [
   {
     type: 'function',
     function: {
-      name: 'add_os_report',
-      description: 'Registra uma anotação, relatório de serviço técnico, foto ou altera o status diretamente no campo Relatório Técnico / Relatório de Serviço de uma Ordem de Serviço (O.S) ou Orçamento. Use SEMPRE que o usuário pedir para registrar serviços executados, pendências em campo ou alterar status de uma OS.',
-      parameters: {
-        type: 'object',
-        properties: {
-          osIdentifier: { type: 'string', description: 'Número do orçamento ou código da OS (ex: "0145/26", "145", "OS-0145/26").' },
-          text: { type: 'string', description: 'Descrição técnica detalhada informando o que foi feito, constatado ou resolvido.' },
-          unitIdentifier: { type: 'string', description: 'Opcional. Se for relativo a um caminhão, placa, casa, bloco ou unidade (ex: "Caminhão 019", "BT 019", "Casa 04").' },
-          status: { type: 'string', description: 'Opcional. Novo status para a OS (ex: "Finalizado", "Em Execução", "Pendente", "Agendada").' },
-          photoUrl: { type: 'string', description: 'Opcional. Se houver foto/anexo para vincular à O.S.' }
-        },
-        required: ['osIdentifier', 'text']
-      }
-    }
-  },
-  {
-    type: 'function',
-    function: {
       name: 'add_vehicle_note',
       description: 'Adiciona uma anotação, histórico de manutenção, troca de pneus, troca de óleo, revisão ou observação diretamente no cadastro do veículo (na aba Veículos). Use SEMPRE que o usuário pedir para registrar ou adicionar observação em um veículo ou na manutenção de um carro/moto/caminhão da frota.',
       parameters: {
