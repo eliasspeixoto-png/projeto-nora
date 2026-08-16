@@ -157,7 +157,8 @@ const PwaUpdateNotification = () => {
     checkForUpdates();
   }, [pathname, checkForUpdates]);
 
-  if (!updateAvailable) return null;
+  // DESATIVADO A PEDIDO DO USUÁRIO POIS ESTAVA EM LOOP
+  return null;
 
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">

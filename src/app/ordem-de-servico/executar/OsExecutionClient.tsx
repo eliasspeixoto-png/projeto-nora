@@ -66,10 +66,9 @@ export default function OsExecutionClient({ initialQuote, initialClient }: OsExe
   const [serviceReport, setServiceReport] = useState(initialQuote.notes || "");
   
   useEffect(() => {
-    if (initialQuote.id) {
-        toast({ title: "Modo Execução v2.5", description: "Sistema de Devolução Estruturada Ativado." });
-    }
-  }, [initialQuote.id]);
+      // Apenas seta o report inicial e inicializa
+      setServiceReport(initialQuote.notes || "");
+  }, [initialQuote]);
 
   const [isUploading, setIsUploading] = useState(false);
   const [attachments, setAttachments] = useState<string[]>(initialQuote.serviceImages || []);
