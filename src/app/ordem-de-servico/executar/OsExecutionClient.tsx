@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Quote, Client } from "@/lib/data";
 import { updateQuote, addServiceImageToQuote, deleteServiceImageFromQuote, createReceivable, updateClient, decrementStockFromQuote, getProductsOnce, addOSReturn } from "@/lib/firebase/firestore";
-import { Loader2, ArrowLeft, User, MapPin, ClipboardList, Check, AlertTriangle, Upload, Trash2, Camera, Edit, Eraser, ImageIcon, PackageCheck, Phone, Smartphone, CalendarClock } from "lucide-react";
+import { Loader2, ArrowLeft, User, MapPin, ClipboardList, Check, AlertTriangle, Upload, Trash2, Camera, Edit, Eraser, ImageIcon, PackageCheck, Phone, Smartphone, CalendarClock, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -154,6 +154,26 @@ export default function OsExecutionClient({ initialQuote, initialClient }: OsExe
         }
     } catch (e) {
         console.error('Falha ao verificar alertas de estoque:', e);
+    }
+  };
+
+  const handleSaveProgress = async () => {
+    if (!quote || !client || !firebase) return;
+    setIsSaving(true);
+    try {
+      const finalReport = materialConfirmation === 'no' && materialDiscrepancyNotes.trim() 
+        ? `${serviceReport}\n\n[REVISÃO DE MATERIAL]:\n${materialDiscrepancyNotes}`
+        : serviceReport;
+        
+      await updateQuote(firebase.db, firebase.auth, quote.id, {
+        notes: finalReport,
+        serviceImages: attachments,
+      });
+      toast({ title: "Progresso Salvo", description: "O relatório e as fotos foram atualizados sem finalizar a O.S." });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Erro ao salvar", description: error.message });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -831,8 +851,14 @@ export default function OsExecutionClient({ initialQuote, initialClient }: OsExe
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            {quote.status !== 'Finalizado' && (
+                <Button onClick={handleSaveProgress} disabled={isSaving} variant="outline" className="border-primary text-primary hover:bg-primary/10 shadow-sm bg-background">
+                    {isSaving ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
+                    Salvar Progresso
+                </Button>
+            )}
             <Button onClick={handleFinishOS} disabled={isSaving} className="bg-green-600 hover:bg-green-700 shadow-md">
-                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Check className="mr-2" />}
+                {isSaving ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Check className="mr-2 h-4 w-4" />}
                 {quote.status === 'Finalizado' ? 'Salvar Alterações da O.S.' : 'Finalizar Serviço'}
             </Button>
         </div>

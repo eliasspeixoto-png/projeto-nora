@@ -9,6 +9,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { motion, useDragControls } from 'framer-motion';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -26,6 +27,8 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
   const { toast } = useToast();
   const pathname = usePathname();
   const router = useRouter();
+  
+  const dragControls = useDragControls();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -383,11 +386,21 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
   }, [messages]);
 
   return (
-    <div className={cn(
-      "fixed top-4 bottom-4 right-4 left-4 sm:left-auto sm:w-[500px] bg-background rounded-xl shadow-2xl border border-border flex flex-col z-50 overflow-hidden transition-all duration-300",
-      !isOpen && "translate-y-[120%] opacity-0 pointer-events-none"
-    )}>
-      <div className="bg-primary text-primary-foreground p-4 shrink-0">
+    <motion.div 
+      drag
+      dragControls={dragControls}
+      dragListener={false}
+      dragMomentum={false}
+      style={{ touchAction: 'none' }}
+      className={cn(
+        "fixed bottom-4 right-4 w-[90vw] sm:w-[450px] h-[80vh] sm:h-[600px] min-w-[300px] min-h-[400px] max-w-[100vw] max-h-[100vh] bg-background rounded-xl shadow-2xl border border-border flex flex-col z-50 overflow-hidden resize transition-opacity duration-300",
+        !isOpen && "opacity-0 pointer-events-none"
+      )}
+    >
+      <div 
+        className="bg-primary text-primary-foreground p-4 shrink-0 cursor-move"
+        onPointerDown={(e) => dragControls.start(e)}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <div className={cn(
@@ -540,6 +553,6 @@ export default function NoraAssistant({ isOpen, setOpen }: NoraAssistantProps) {
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -8,7 +8,7 @@ import { deleteQuote, updateQuote, getOSReturns, getQuotes, getClients } from '@
 import type { Quote, UserProfile, OSReturn, Client } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, PlusCircle, User, MapPin, Search, HardHat, Eye, Edit, Trash2, Calendar, Check, AlertTriangle, MoreHorizontal, ChevronLeft, ChevronRight, DollarSign, Layers, Tag, CalendarRange, Truck, Building } from 'lucide-react';
+import { Loader2, PlusCircle, User, MapPin, Search, HardHat, Eye, Edit, Trash2, Calendar, Check, AlertTriangle, MoreHorizontal, ChevronLeft, ChevronRight, DollarSign, Layers, Tag, CalendarRange, Truck, Building, Activity } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -245,6 +245,16 @@ export default function OrdemDeServicoPage() {
         } finally {
             setAlertOpen(false);
             setOsToDelete(null);
+        }
+    };
+
+    const handleUpdateStatus = async (osId: string, newStatus: Quote['status']) => {
+        if (!firebase.db || !firebase.auth) return;
+        try {
+            await updateQuote(firebase.db, firebase.auth, osId, { status: newStatus });
+            toast({ title: 'Sucesso', description: `Status atualizado para ${newStatus}` });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Erro ao atualizar status', description: error.message });
         }
     };
 
@@ -581,6 +591,11 @@ export default function OrdemDeServicoPage() {
                                                                         Até: {formatDate(os.expectedEndDate)}
                                                                     </span>
                                                                 )}
+                                                                {os.completionDate && (
+                                                                    <span className="text-[10px] text-green-600 dark:text-green-400 font-bold mt-0.5">
+                                                                        Execução: {formatDateTimeSafe(os.completionDate)}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </TableCell>
                                                         <TableCell className="py-0 text-xs font-semibold px-6 opacity-70 group-hover:opacity-100 transition-all text-foreground">{os.assignedTechnicianName || 'Não atribuído'}</TableCell>
@@ -619,6 +634,28 @@ export default function OrdemDeServicoPage() {
                                                                     {os.status === 'revision-pending' && (
                                                                         <DropdownMenuItem className="h-9 rounded-xl font-semibold text-green-600 cursor-pointer text-xs" onClick={() => handleConfirmRevision(os.id)}><Check className="mr-2 h-3.5 w-3.5" />Confirmar Revisão</DropdownMenuItem>
                                                                     )}
+                                                                    <DropdownMenuSeparator className="bg-primary/5" />
+                                                                    
+                                                                    <DropdownMenuSub>
+                                                                        <DropdownMenuSubTrigger className="h-9 rounded-xl font-semibold text-xs">
+                                                                            <Activity className="mr-2 h-3.5 w-3.5" /> Alterar Status
+                                                                        </DropdownMenuSubTrigger>
+                                                                        <DropdownMenuPortal>
+                                                                            <DropdownMenuSubContent className="rounded-xl bg-background/95 backdrop-blur-3xl border-border/40 shadow-premium min-w-[140px]">
+                                                                                {['Pendente', 'Agendado', 'Atribuída', 'Em Execução', 'Finalizado', 'Atrasada', 'Devolvida'].map(statusOption => (
+                                                                                    <DropdownMenuItem 
+                                                                                        key={statusOption} 
+                                                                                        className={`h-8 text-xs font-semibold cursor-pointer ${os.status === statusOption ? 'bg-primary/10 text-primary' : ''}`}
+                                                                                        onClick={() => handleUpdateStatus(os.id, statusOption as Quote['status'])}
+                                                                                    >
+                                                                                        {os.status === statusOption && <Check className="mr-2 h-3 w-3" />}
+                                                                                        <span className={os.status === statusOption ? '' : 'ml-5'}>{statusOption}</span>
+                                                                                    </DropdownMenuItem>
+                                                                                ))}
+                                                                            </DropdownMenuSubContent>
+                                                                        </DropdownMenuPortal>
+                                                                    </DropdownMenuSub>
+
                                                                     <DropdownMenuSeparator className="bg-primary/5" />
                                                                     <DropdownMenuItem className="h-9 rounded-xl font-semibold text-destructive cursor-pointer text-xs" onClick={() => confirmDelete(os.id)}><Trash2 className="mr-2 h-3.5 w-3.5" />Excluir</DropdownMenuItem>
                                                                 </DropdownMenuContent>
