@@ -242,7 +242,7 @@ async function startBaileys() {
                 const transcribedText = await transcribeAudioBuffer(audioBuffer);
                 if (transcribedText) {
                     console.log(`📝 [ÁUDIO TRANSSCRITO COM SUCESSO]: "${transcribedText}"`);
-                    text = `[Áudio enviado pelo usuário]: "${transcribedText}"`;
+                    text = `[Áudio do usuário transcrito]: "${transcribedText}"`;
                 } else {
                     console.warn("⚠️ Não foi possível converter o áudio em texto.");
                     await sock.sendMessage(remoteJid, { text: "Desculpe, não consegui compreender o áudio perfeitamente. Poderia enviar novamente ou mandar por mensagem de texto? 😊" });
