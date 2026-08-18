@@ -248,15 +248,7 @@ export default function OrdemDeServicoPage() {
         }
     };
 
-    const handleUpdateStatus = async (osId: string, newStatus: Quote['status']) => {
-        if (!firebase.db || !firebase.auth) return;
-        try {
-            await updateQuote(firebase.db, firebase.auth, osId, { status: newStatus });
-            toast({ title: 'Sucesso', description: `Status atualizado para ${newStatus}` });
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao atualizar status', description: error.message });
-        }
-    };
+
 
     const handleSchedule = (os: Quote) => {
         setOsToSchedule(os);
