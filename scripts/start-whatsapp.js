@@ -418,6 +418,8 @@ async function startBaileys() {
                             .replace(/\[\[ azul: (.*?) \]\]/g, '$1')
                             .replace(/\*\*(.*?)\*\*/g, '$1')
                             .replace(/\*/g, '')
+                            .replace(/(\d)\.(\d{3})/g, '$1$2')
+                            .replace(/R\$\s?/gi, 'reais ')
                             .trim();
 
                         const voiceBuffer = await textToSpeechBuffer(textForVoice, 'Elias');
