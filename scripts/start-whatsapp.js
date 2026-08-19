@@ -411,7 +411,16 @@ async function startBaileys() {
                     console.log(`🎙️ [ENVIANDO NOTA DE VOZ] Sintetizando voz da NORA para ${remoteJid}...`);
                     try {
                         await sock.sendPresenceUpdate('recording', remoteJid);
-                        const voiceBuffer = await textToSpeechBuffer(responseText, 'Elias');
+                        
+                        // Tratamento exclusivo para o Áudio: Remove emojis e markdown (*) para a voz ficar humana
+                        const textForVoice = responseText
+                            .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
+                            .replace(/\[\[ azul: (.*?) \]\]/g, '$1')
+                            .replace(/\*\*(.*?)\*\*/g, '$1')
+                            .replace(/\*/g, '')
+                            .trim();
+
+                        const voiceBuffer = await textToSpeechBuffer(textForVoice, 'Elias');
                         if (voiceBuffer) {
                             await sock.sendMessage(remoteJid, {
                                 audio: voiceBuffer,
