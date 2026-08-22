@@ -65,7 +65,7 @@ export default function FinanceiroPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 20;
     
-    const { items: sortedReceivables, requestSort, sortConfig } = useSortableData(receivables, { key: 'dueDate', direction: 'asc' });
+    const { items: sortedReceivables, requestSort, sortConfig } = useSortableData(receivables, { key: 'dueDate', direction: 'desc' });
 
     // Dialog states
     const [isCashPaymentOpen, setCashPaymentOpen] = useState(false);
