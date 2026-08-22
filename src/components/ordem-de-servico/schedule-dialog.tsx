@@ -58,6 +58,7 @@ type ScheduleServiceDialogProps = {
   teamMembers: UserProfile[];
   currentTechnicianId?: string;
   currentOS?: Quote | null;
+  canChangeTechnician?: boolean;
 };
 
 export default function ScheduleServiceDialog({
@@ -68,6 +69,7 @@ export default function ScheduleServiceDialog({
   teamMembers,
   currentTechnicianId,
   currentOS,
+  canChangeTechnician = true,
 }: ScheduleServiceDialogProps) {
   const [isCalendarOpen, setCalendarOpen] = useState(false);
   const [isEndCalendarOpen, setEndCalendarOpen] = useState(false);
@@ -150,7 +152,7 @@ export default function ScheduleServiceDialog({
                   <FormLabel className="flex items-center gap-2 font-semibold text-xs text-foreground/80">
                     <User className="h-3.5 w-3.5 text-primary" /> Técnico / Responsável
                   </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!canChangeTechnician}>
                     <FormControl>
                       <SelectTrigger className="h-9 text-xs font-semibold">
                         <SelectValue placeholder="Selecione um técnico..." />

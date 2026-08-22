@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/firebase/auth/use-user";
-import { getQuotes, getVisits, deleteQuote, deleteVisit, getTeamMembers, updateVisit, addVisit } from "@/lib/firebase/firestore";
+import { getQuotes, getVisits, deleteQuote, deleteVisit, getTeamMembers, updateVisit, addVisit, updateQuote } from "@/lib/firebase/firestore";
 import type { Quote, Visit, UserProfile, Client, QuoteData } from "@/lib/data";
 import { Loader2, HardHat, Construction } from "lucide-react";
 import TaskCard from "@/components/minhas-tarefas/task-card";
@@ -12,6 +12,7 @@ import { osStatusConfig } from "@/components/ordem-de-servico/os-status-config";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import AddEditVisitDialog from "@/components/visitas/add-edit-visit-dialog";
+import ScheduleServiceDialog from "@/components/ordem-de-servico/schedule-dialog";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle } from "lucide-react";
 
@@ -30,6 +31,8 @@ export default function MinhasTarefasPage() {
   
   const [isVisitDialogOpen, setVisitDialogOpen] = useState(false);
   const [editingVisit, setEditingVisit] = useState<Visit | undefined>(undefined);
+  const [isScheduleOpen, setScheduleOpen] = useState(false);
+  const [taskToSchedule, setTaskToSchedule] = useState<Task | null>(null);
 
   useEffect(() => {
     if (!userProfile?.companyId || !userProfile.uid || !firebase.db) {
@@ -146,6 +149,59 @@ export default function MinhasTarefasPage() {
         setTaskToDelete(null);
     }
   };
+
+  const handleSchedule = (task: Task) => {
+    setTaskToSchedule(task);
+    setScheduleOpen(true);
+  };
+
+  const handleConfirmSchedule = async (data: any) => {
+    if (!taskToSchedule || !firebase.db || !firebase.auth) return;
+
+    try {
+        if (taskToSchedule.taskType === 'os') {
+            const tech = teamMembers.find(t => t.uid === data.technicianId);
+            const newStatus = data.technicianId ? 'Atribuída' : 'Agendado';
+            
+            const updatePayload: any = {
+                status: newStatus as Quote['status'],
+                scheduledDate: data.date,
+                scheduledTime: data.time,
+                executionStartDate: data.date,
+                executionStartTime: data.time,
+                schedulingNotes: data.notes,
+                assignedTechnicianId: data.technicianId || '',
+                assignedTechnicianName: tech?.displayName || 'Não atribuído',
+                assignedAt: data.technicianId ? new Date().toISOString() : null,
+                statusHistory: [
+                    ...(taskToSchedule.statusHistory || []),
+                    {
+                        status: newStatus,
+                        changedAt: new Date().toISOString(),
+                        changedBy: userProfile?.uid,
+                        notes: data.technicianId 
+                            ? `O.S. Atribuída ao técnico ${tech?.displayName || 'desconhecido'}` 
+                            : `O.S. Agendada para ${data.date} às ${data.time}`
+                    }
+                ]
+            };
+
+            if (data.expectedEndDate) {
+                updatePayload.expectedEndDate = data.expectedEndDate;
+                updatePayload.expectedEndTime = data.expectedEndTime || '18:00';
+            }
+            if (data.unitIdentifier) {
+                updatePayload.unitIdentifier = data.unitIdentifier;
+            }
+
+            await updateQuote(firebase.db, firebase.auth, taskToSchedule.id, updatePayload);
+            toast({ title: 'O.S. Atualizada!', description: data.technicianId ? 'Técnico atribuído com sucesso.' : 'Serviço agendado.' });
+        }
+        setScheduleOpen(false);
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "Erro ao atualizar", description: error.message });
+    }
+  };
   
   const onVisitSaved = async (visitData: any, visitId?: string) => {
     if (!userProfile?.companyId || !firebase.db || !firebase.auth) return;
@@ -218,6 +274,7 @@ export default function MinhasTarefasPage() {
                         type: isOs ? 'Ordem de Serviço' : 'Visita Técnica',
                         onEdit: () => handleTaskClick(task),
                         onAdminEdit: (userProfile?.role === 'admin' || userProfile?.role === 'supervisor') ? () => handleAdminEdit(task) : undefined,
+                        onSchedule: isOs ? () => handleSchedule(task) : undefined,
                         onDelete: () => confirmDelete(task),
                         canDelete: canDelete,
                         originalDate: isOs ? (task as Quote).originalDate : (task as Visit).originalDate
@@ -284,6 +341,17 @@ export default function MinhasTarefasPage() {
         clients={[]}
         teamMembers={teamMembers}
         allVisits={visitTasks as any}
+      />
+
+      <ScheduleServiceDialog
+        isOpen={isScheduleOpen}
+        setOpen={setScheduleOpen}
+        onSchedule={handleConfirmSchedule}
+        quoteNumber={taskToSchedule?.taskType === 'os' ? (taskToSchedule as Quote).quoteNumber : ''}
+        teamMembers={teamMembers}
+        currentTechnicianId={taskToSchedule?.taskType === 'os' ? (taskToSchedule as Quote).assignedTechnicianId : undefined}
+        currentOS={taskToSchedule?.taskType === 'os' ? taskToSchedule as Quote : null}
+        canChangeTechnician={userProfile?.role === 'admin' || userProfile?.role === 'supervisor'}
       />
     </>
   );

@@ -30,6 +30,7 @@ type TaskProps = {
   type: string;
   onEdit?: () => void;
   onAdminEdit?: () => void;
+  onSchedule?: () => void;
   onDelete?: () => void;
   canDelete?: boolean;
   originalDate?: string;
@@ -162,6 +163,12 @@ export default function TaskCard({
                         <DropdownMenuItem className="h-10 rounded-xl font-semibold cursor-pointer" onClick={(e) => {e.stopPropagation(); task.onAdminEdit?.();}}>
                             <FilePen className="mr-2 h-4 w-4 text-primary"/>
                             Editar Detalhes (O.S)
+                        </DropdownMenuItem>
+                    )}
+                    {task.onSchedule && (
+                        <DropdownMenuItem className="h-10 rounded-xl font-semibold cursor-pointer" onClick={(e) => {e.stopPropagation(); task.onSchedule?.();}}>
+                            <CalendarRange className="mr-2 h-4 w-4 text-primary"/>
+                            Cronograma / Atribuir
                         </DropdownMenuItem>
                     )}
                     {task.canDelete && (
