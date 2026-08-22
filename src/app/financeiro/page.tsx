@@ -61,7 +61,7 @@ export default function FinanceiroPage() {
     const [receivables, setReceivables] = useState<AccountsReceivable[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState('Atrasado');
+    const [activeTab, setActiveTab] = useState('all');
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 20;
     
@@ -229,10 +229,10 @@ export default function FinanceiroPage() {
                 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="h-12 p-1.5 bg-background/40 backdrop-blur-3xl rounded-[1.2rem] border border-border/40 shadow-premium self-start gap-1">
-                        <TabsTrigger value="Atrasado" className="h-full px-6 rounded-xl font-semibold uppercase text-[10px] tracking-widest data-[state=active]:bg-destructive data-[state=active]:text-white transition-all">Atrasadas</TabsTrigger>
-                        <TabsTrigger value="Pendente" className="h-full px-6 rounded-xl font-semibold uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-white transition-all">Pendentes</TabsTrigger>
-                        <TabsTrigger value="Pago" className="h-full px-6 rounded-xl font-semibold uppercase text-[10px] tracking-widest data-[state=active]:bg-green-500 data-[state=active]:text-white transition-all">Pagos</TabsTrigger>
                         <TabsTrigger value="all" className="h-full px-6 rounded-xl font-semibold uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-white transition-all">Todas</TabsTrigger>
+                        <TabsTrigger value="Pendente" className="h-full px-6 rounded-xl font-semibold uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-white transition-all">Pendentes</TabsTrigger>
+                        <TabsTrigger value="Atrasado" className="h-full px-6 rounded-xl font-semibold uppercase text-[10px] tracking-widest data-[state=active]:bg-destructive data-[state=active]:text-white transition-all">Atrasadas</TabsTrigger>
+                        <TabsTrigger value="Pago" className="h-full px-6 rounded-xl font-semibold uppercase text-[10px] tracking-widest data-[state=active]:bg-green-500 data-[state=active]:text-white transition-all">Pagos</TabsTrigger>
                     </TabsList>
                 </Tabs>
             </header>
